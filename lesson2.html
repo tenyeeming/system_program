@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第2課：SIC 機器架構 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container"><h1>⚙️ 系統程式 System Programming</h1></div>
+</header>
+
+<nav class="lesson-nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-home">🏠 首頁</a>
+    <a href="lesson1.html">1. 數值系統</a>
+    <a href="lesson2.html" class="active">2. SIC架構</a>
+    <a href="lesson3.html">3. SIC/XE</a>
+    <a href="lesson4.html">4. 組合語言</a>
+    <a href="lesson5.html">5. Two-Pass</a>
+    <a href="lesson6.html">6. One-Pass</a>
+    <a href="lesson7.html">7. 定址模式</a>
+    <a href="lesson8.html">8. 程式重定位</a>
+  </div>
+</nav>
+
+<div class="lesson-header">
+  <div class="container">
+    <div class="lesson-num">2</div>
+    <div>
+      <h1>SIC 機器架構</h1>
+      <div class="lesson-sub">記憶體 ｜ 暫存器 ｜ 指令格式 ｜ Fetch-Decode-Execute</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ── 什麼是 SIC ───────────────────────────────────────── -->
+<div class="section">
+  <h2>🖥️ 1. 什麼是 SIC？</h2>
+  <p><strong>SIC（Simplified Instructional Computer）</strong>是教科書設計的<strong>假想電腦</strong>，用來學習系統程式的核心概念。它夠簡單但包含真實電腦的必要功能。</p>
+  <p>SIC 有兩個版本：</p>
+  <ul>
+    <li><strong>Standard SIC</strong>：基本版，功能精簡</li>
+    <li><strong>SIC/XE（eXtra Equipment）</strong>：擴充版，下一課介紹</li>
+  </ul>
+  <div class="box box-info">
+    <strong>📌 為什麼要學 SIC？</strong>
+    因為組譯器、載入器等系統程式的設計，都跟機器架構高度相關。學 SIC 後，你能把原理套用到任何真實電腦。
+  </div>
+</div>
+
+<!-- ── 記憶體 ──────────────────────────────────────────── -->
+<div class="section">
+  <h2>💾 2. 記憶體（Memory）</h2>
+  <ul>
+    <li>基本單位：<strong>8-bit byte</strong></li>
+    <li>3 個連續 byte = 1 個 <strong>word（24 bits）</strong>（注意：SIC 特有！一般電腦是 4 bytes）</li>
+    <li>記憶體大小：<strong>2¹⁵ = 32,768 bytes</strong></li>
+    <li>位址範圍：<code>0x0000</code> ~ <code>0x7FFF</code>（15-bit 位址）</li>
+  </ul>
+
+  <div class="diagram">
+    <svg viewBox="0 0 500 180" width="500" height="180" font-family="sans-serif" font-size="13">
+      <text x="250" y="22" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af">SIC 記憶體結構</text>
+      <!-- Memory block -->
+      <rect x="60" y="35" width="120" height="120" rx="6" fill="#f8fafc" stroke="#2563eb" stroke-width="2"/>
+      <!-- Cells -->
+      <rect x="60" y="35"  width="120" height="30" rx="0" fill="#dbeafe" stroke="#93c5fd"/>
+      <rect x="60" y="65"  width="120" height="30" fill="#eff6ff" stroke="#93c5fd"/>
+      <rect x="60" y="95"  width="120" height="30" fill="#dbeafe" stroke="#93c5fd"/>
+      <rect x="60" y="125" width="120" height="30" rx="0" fill="#eff6ff" stroke="#93c5fd"/>
+      <!-- Address labels -->
+      <text x="55" y="55"  text-anchor="end" fill="#64748b" font-size="12">0x0000</text>
+      <text x="55" y="85"  text-anchor="end" fill="#64748b" font-size="12">0x0001</text>
+      <text x="55" y="115" text-anchor="end" fill="#64748b" font-size="12">0x0002</text>
+      <text x="55" y="145" text-anchor="end" fill="#64748b" font-size="12">0x0003</text>
+      <!-- Cell content -->
+      <text x="120" y="55"  text-anchor="middle" fill="#1e293b">8 bits (1 byte)</text>
+      <text x="120" y="85"  text-anchor="middle" fill="#1e293b">8 bits (1 byte)</text>
+      <text x="120" y="115" text-anchor="middle" fill="#1e293b">8 bits (1 byte)</text>
+      <text x="120" y="145" text-anchor="middle" fill="#1e293b">8 bits (1 byte)</text>
+      <!-- Word bracket -->
+      <path d="M190,35 L205,35 L205,95 L190,95" stroke="#dc2626" stroke-width="2" fill="none"/>
+      <text x="210" y="70" fill="#dc2626" font-weight="bold">1 Word</text>
+      <text x="210" y="88" fill="#dc2626" font-size="11">(3 bytes = 24 bits)</text>
+      <!-- Total -->
+      <text x="250" y="165" text-anchor="middle" fill="#64748b" font-size="12">總共 2¹⁵ = 32,768 bytes</text>
+    </svg>
+    <div class="caption">SIC 記憶體：以 byte 為單位定址，3 bytes = 1 word</div>
+  </div>
+</div>
+
+<!-- ── 暫存器 ──────────────────────────────────────────── -->
+<div class="section">
+  <h2>📦 3. 暫存器（Registers）</h2>
+  <p>SIC 共有 <strong>5 個暫存器</strong>，每個都是 <strong>24 bits</strong>。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 328" width="680" height="328" font-family="sans-serif" font-size="13">
+      <text x="340" y="22" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af">SIC 暫存器</text>
+      <!-- Register rows -->
+      <!-- A -->
+      <rect x="20" y="35" width="40" height="44" rx="6" fill="#2563eb"/>
+      <text x="40" y="53" text-anchor="middle" fill="white" font-weight="bold" font-size="16">A</text>
+      <text x="40" y="71" text-anchor="middle" fill="#bfdbfe" font-size="11">編號 0</text>
+      <rect x="70" y="35" width="400" height="44" rx="6" fill="#eff6ff" stroke="#2563eb"/>
+      <text x="270" y="56" text-anchor="middle" fill="#1e40af" font-weight="bold">Accumulator（累加器）</text>
+      <text x="270" y="72" text-anchor="middle" fill="#64748b" font-size="12">算術運算的主要暫存器，ADD/SUB/MUL/DIV 的結果都存這裡</text>
+      <!-- X -->
+      <rect x="20" y="90" width="40" height="44" rx="6" fill="#7c3aed"/>
+      <text x="40" y="108" text-anchor="middle" fill="white" font-weight="bold" font-size="16">X</text>
+      <text x="40" y="126" text-anchor="middle" fill="#e9d5ff" font-size="11">編號 1</text>
+      <rect x="70" y="90" width="400" height="44" rx="6" fill="#f5f3ff" stroke="#7c3aed"/>
+      <text x="270" y="111" text-anchor="middle" fill="#6d28d9" font-weight="bold">Index Register（索引暫存器）</text>
+      <text x="270" y="127" text-anchor="middle" fill="#64748b" font-size="12">索引定址：TA = address + (X)，常用於陣列循環</text>
+      <!-- L -->
+      <rect x="20" y="145" width="40" height="44" rx="6" fill="#0891b2"/>
+      <text x="40" y="163" text-anchor="middle" fill="white" font-weight="bold" font-size="16">L</text>
+      <text x="40" y="181" text-anchor="middle" fill="#a5f3fc" font-size="11">編號 2</text>
+      <rect x="70" y="145" width="400" height="44" rx="6" fill="#ecfeff" stroke="#0891b2"/>
+      <text x="270" y="166" text-anchor="middle" fill="#155e75" font-weight="bold">Linkage Register（連結暫存器）</text>
+      <text x="270" y="182" text-anchor="middle" fill="#64748b" font-size="12">JSUB 時儲存返回位址（L ← PC），RSUB 時用 PC ← L 返回</text>
+      <!-- PC -->
+      <rect x="20" y="200" width="40" height="44" rx="6" fill="#059669"/>
+      <text x="40" y="218" text-anchor="middle" fill="white" font-weight="bold" font-size="14">PC</text>
+      <text x="40" y="236" text-anchor="middle" fill="#a7f3d0" font-size="11">編號 8</text>
+      <rect x="70" y="200" width="400" height="44" rx="6" fill="#f0fdf4" stroke="#059669"/>
+      <text x="270" y="221" text-anchor="middle" fill="#065f46" font-weight="bold">Program Counter（程式計數器）</text>
+      <text x="270" y="237" text-anchor="middle" fill="#64748b" font-size="12">存著下一條要執行的指令位址，每次 Fetch 後 +3</text>
+      <!-- SW -->
+      <rect x="20" y="255" width="40" height="65" rx="6" fill="#d97706"/>
+      <text x="40" y="276" text-anchor="middle" fill="white" font-weight="bold" font-size="13">SW</text>
+      <text x="40" y="297" text-anchor="middle" fill="#fef3c7" font-size="10">編號 9</text>
+      <rect x="70" y="255" width="590" height="65" rx="6" fill="#fffbeb" stroke="#d97706"/>
+      <text x="355" y="275" text-anchor="middle" fill="#78350f" font-weight="bold">Status Word（狀態字組）</text>
+      <text x="355" y="292" text-anchor="middle" fill="#64748b" font-size="11">CC（Condition Code）：&lt; = &gt; 三種狀態</text>
+      <text x="355" y="309" text-anchor="middle" fill="#64748b" font-size="11">COMP 比較後設定；JLT/JEQ/JGT 根據 CC 決定跳躍</text>
+    </svg>
+    <div class="caption">5 個暫存器，每個 24 bits</div>
+  </div>
+
+  <div class="box box-warning">
+    <strong>⚠️ 常考重點</strong>
+    L 暫存器（Linkage）是 SIC 副程式呼叫的關鍵。JSUB 自動把 PC 存入 L，RSUB 從 L 跳回。
+    如果副程式呼叫副程式（巢狀），需要先把 L 存到記憶體，否則 L 的值會被蓋掉！
+  </div>
+
+  <div class="box box-info">
+    <strong>📖 名詞解釋：你可能看不懂的術語</strong>
+    <div class="table-wrap" style="margin-top:.6rem">
+      <table>
+        <tr><th>術語</th><th>全名</th><th>白話說明</th></tr>
+        <tr>
+          <td><strong>Accumulator</strong><br><small style="color:#64748b">累加器（A）</small></td>
+          <td>—</td>
+          <td>所有算術運算的「草稿紙」。做 ADD/SUB/MUL/DIV 時，結果自動放進 A，不需另外指定要存哪裡。</td>
+        </tr>
+        <tr>
+          <td><strong>TA</strong></td>
+          <td>Target Address<br><small style="color:#64748b">目標位址</small></td>
+          <td>指令真正要存取的記憶體位址。直接定址：TA = address；索引定址：TA = address + (X)。</td>
+        </tr>
+        <tr>
+          <td><strong>Linkage</strong><br><small style="color:#64748b">連結（L）</small></td>
+          <td>—</td>
+          <td>好比書籤。JSUB 呼叫副程式前，把「呼叫完要回去的位址（PC）」夾進 L；副程式做完，RSUB 再從 L 跳回去。</td>
+        </tr>
+        <tr>
+          <td><strong>CC</strong></td>
+          <td>Condition Code<br><small style="color:#64748b">條件碼</small></td>
+          <td>存在 SW 裡，只有三種值：<code>&lt;</code>（小於）、<code>=</code>（等於）、<code>&gt;</code>（大於）。COMP 比較 A 和記憶體後設定，讓 JLT/JEQ/JGT 決定要不要跳。</td>
+        </tr>
+        <tr>
+          <td><strong>Program Counter</strong><br><small style="color:#64748b">程式計數器（PC）</small></td>
+          <td>—</td>
+          <td>好比看書時眼睛指向下一個字的游標，告訴 CPU「下一條指令在哪」。每讀完一條指令（3 bytes）就自動 +3。</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── 指令格式 ─────────────────────────────────────────── -->
+<div class="section">
+  <h2>📐 4. 指令格式（Instruction Format）</h2>
+  <p>SIC 每條指令固定 <strong>24 bits（3 bytes）</strong>，分成三個欄位：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 660 140" width="660" height="140" font-family="monospace" font-size="14">
+      <text x="330" y="22" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af">SIC 24-bit 指令格式</text>
+      <!-- Bit labels top -->
+      <text x="30"  y="42" fill="#64748b" font-size="11">bit 23</text>
+      <text x="235" y="42" fill="#64748b" font-size="11">bit 16</text>
+      <text x="305" y="42" fill="#64748b" font-size="11">bit 15</text>
+      <text x="630" y="42" fill="#64748b" font-size="11" text-anchor="end">bit 0</text>
+      <!-- Fields -->
+      <rect x="20"  y="50" width="250" height="50" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <rect x="275" y="50" width="40"  height="50" rx="6" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <rect x="320" y="50" width="320" height="50" rx="6" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <!-- Labels -->
+      <text x="145" y="70" text-anchor="middle" fill="#1e40af" font-weight="bold">opcode</text>
+      <text x="145" y="88" text-anchor="middle" fill="#64748b" font-size="12">8 bits</text>
+      <text x="295" y="70" text-anchor="middle" fill="#6d28d9" font-weight="bold">x</text>
+      <text x="295" y="88" text-anchor="middle" fill="#64748b" font-size="12">1 bit</text>
+      <text x="480" y="70" text-anchor="middle" fill="#065f46" font-weight="bold">address</text>
+      <text x="480" y="88" text-anchor="middle" fill="#64748b" font-size="12">15 bits</text>
+      <!-- Annotations -->
+      <text x="145" y="120" text-anchor="middle" fill="#1e40af" font-size="12">決定指令類型（如 LDA=0x00）</text>
+      <text x="295" y="120" text-anchor="middle" fill="#6d28d9" font-size="12">0=直接 1=索引</text>
+      <text x="480" y="120" text-anchor="middle" fill="#065f46" font-size="12">操作數的記憶體位址</text>
+    </svg>
+    <div class="caption">opcode(8) | x(1) | address(15) — 總共 24 bits = 3 bytes</div>
+  </div>
+
+  <div class="box box-info" style="margin-bottom:1.2rem">
+    <strong>📐 各欄位詳解</strong>
+    <div class="table-wrap" style="margin-top:.6rem">
+      <table>
+        <tr><th>欄位</th><th>位元數</th><th>位置</th><th>功能說明</th></tr>
+        <tr>
+          <td><strong>opcode</strong></td>
+          <td>8 bits</td>
+          <td>bit 23 ~ bit 16</td>
+          <td>指令類型代碼，告訴 CPU 要做什麼動作。例：<code>0x00</code>=LDA、<code>0x0C</code>=ADD、<code>0x48</code>=JSUB。每種指令各有固定的 opcode，查 OPTAB 即可知道。</td>
+        </tr>
+        <tr>
+          <td><strong>x</strong></td>
+          <td>1 bit</td>
+          <td>bit 15</td>
+          <td>定址模式旗標（索引位元）。<code>0</code> → 直接定址，TA = address；<code>1</code> → 索引定址，TA = address + (X)。在組合語言中寫 <code>STCH BUFFER,X</code> 就是把 x 設成 1。</td>
+        </tr>
+        <tr>
+          <td><strong>address</strong></td>
+          <td>15 bits</td>
+          <td>bit 14 ~ bit 0</td>
+          <td>操作數的記憶體位址，範圍 0x0000 ~ 0x7FFF，剛好 2¹⁵ = 32768 個位址——這就是為什麼 SIC 記憶體大小是 2¹⁵ bytes。配合 x bit 算出 TA 後，才去記憶體讀寫資料。</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>兩種定址模式</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>x bit</th><th>定址模式</th><th>目標位址 TA 計算</th><th>範例</th></tr>
+      <tr><td><code>0</code></td><td><strong>Direct（直接定址）</strong></td><td>TA = address</td><td><code>LDA ALPHA</code></td></tr>
+      <tr><td><code>1</code></td><td><strong>Indexed（索引定址）</strong></td><td>TA = address + (X)</td><td><code>STCH BUFFER,X</code></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ── 指令集 ──────────────────────────────────────────── -->
+<div class="section">
+  <h2>📋 5. 重要指令集</h2>
+
+  <h3>載入 / 儲存</h3>
+  <pre><code><span class="lbl">LDA</span>  m   →  A ← (m)           載入 word 到 A
+<span class="lbl">STA</span>  m   →  m ← (A)           把 A 儲存到記憶體
+<span class="lbl">LDX</span>  m   →  X ← (m)           載入到 X（索引暫存器）
+<span class="lbl">STX</span>  m   →  m ← (X)           把 X 儲存到記憶體
+<span class="lbl">LDL</span>  m   →  L ← (m)           載入到 L（連結暫存器）
+<span class="lbl">STL</span>  m   →  m ← (L)           把 L 儲存到記憶體
+<span class="lbl">LDCH</span> m   →  A[低8位] ← (m)[低8位]  載入 1 個字元（byte）
+<span class="lbl">STCH</span> m   →  m[低8位] ← A[低8位]  儲存 1 個字元（byte）</code></pre>
+
+  <h3>算術運算（結果都存入 A）</h3>
+  <pre><code><span class="lbl">ADD</span>  m   →  A ← (A) + (m)
+<span class="lbl">SUB</span>  m   →  A ← (A) - (m)
+<span class="lbl">MUL</span>  m   →  A ← (A) × (m)
+<span class="lbl">DIV</span>  m   →  A ← (A) ÷ (m)</code></pre>
+
+  <h3>比較與跳躍</h3>
+  <pre><code><span class="lbl">COMP</span> m   →  比較 (A) 和 (m)，設定 SW 的 CC（'&lt;', '=', '&gt;'）
+<span class="lbl">JLT</span>  m   →  若 CC = '&lt;' 則跳到 m
+<span class="lbl">JEQ</span>  m   →  若 CC = '=' 則跳到 m
+<span class="lbl">JGT</span>  m   →  若 CC = '&gt;' 則跳到 m
+<span class="lbl">J</span>    m   →  無條件跳到 m</code></pre>
+
+  <h3>副程式</h3>
+  <pre><code><span class="lbl">JSUB</span> m   →  L ← (PC)；PC ← m   呼叫副程式（Jump to SUBroutine）
+<span class="lbl">RSUB</span>     →  PC ← (L)          從副程式返回（Return from SUBroutine）</code></pre>
+
+  <h3>I/O（每次 1 byte）</h3>
+  <pre><code><span class="lbl">TD</span>   m   →  測試裝置 m 是否就緒，設定 CC（'&lt;'=就緒，'='=忙碌）
+<span class="lbl">RD</span>   m   →  A[低8位] ← 從裝置 m 讀入 1 byte
+<span class="lbl">WD</span>   m   →  裝置 m ← A[低8位]  寫出 1 byte</code></pre>
+
+  <div class="box box-tip">
+    <strong>💡 I/O 使用範例（等待裝置就緒再讀取）</strong>
+    <pre style="margin-top:.5rem;font-size:.8rem"><code>INLOOP  <span class="lbl">TD</span>   INDEV   <span class="cm">. 測試裝置</span>
+        <span class="lbl">JEQ</span>  INLOOP  <span class="cm">. CC='=' 表示忙碌，繼續等</span>
+        <span class="lbl">RD</span>   INDEV   <span class="cm">. CC='&lt;' 表示就緒，讀取</span>
+        <span class="lbl">STCH</span> DATA    <span class="cm">. 儲存讀入的字元</span>
+INDEV   <span class="lbl">BYTE</span> X'F1' <span class="cm">. 裝置號碼 F1</span></code></pre>
+  </div>
+</div>
+
+<!-- ── Fetch-Decode-Execute ───────────────────────────── -->
+<div class="section">
+  <h2>⚡ 6. Fetch-Decode-Execute 循環</h2>
+  <p>CPU 執行每條指令都會走過這個循環：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 160" width="680" height="160" font-family="sans-serif" font-size="13">
+      <!-- Boxes -->
+      <rect x="20"  y="50" width="130" height="60" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <rect x="195" y="50" width="130" height="60" rx="10" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <rect x="370" y="50" width="130" height="60" rx="10" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <rect x="545" y="50" width="115" height="60" rx="10" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <!-- Labels -->
+      <text x="85"  y="75" text-anchor="middle" fill="#1e40af" font-weight="bold">① FETCH</text>
+      <text x="85"  y="95" text-anchor="middle" fill="#64748b" font-size="11">從 PC 取出指令</text>
+      <text x="85" y="110" text-anchor="middle" fill="#64748b" font-size="11">PC += 3</text>
+      <text x="260" y="75" text-anchor="middle" fill="#6d28d9" font-weight="bold">② DECODE</text>
+      <text x="260" y="95" text-anchor="middle" fill="#64748b" font-size="11">解析 opcode</text>
+      <text x="260" y="110" text-anchor="middle" fill="#64748b" font-size="11">x, address</text>
+      <text x="435" y="75" text-anchor="middle" fill="#065f46" font-weight="bold">③ EXECUTE</text>
+      <text x="435" y="95" text-anchor="middle" fill="#64748b" font-size="11">ALU 執行</text>
+      <text x="435" y="110" text-anchor="middle" fill="#64748b" font-size="11">運算</text>
+      <text x="602" y="75" text-anchor="middle" fill="#92400e" font-weight="bold">④ STORE</text>
+      <text x="602" y="95" text-anchor="middle" fill="#64748b" font-size="11">結果寫回</text>
+      <text x="602" y="110" text-anchor="middle" fill="#64748b" font-size="11">暫存器/記憶體</text>
+      <!-- Arrows -->
+      <path d="M152,80 L192,80" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#farr)"/>
+      <path d="M327,80 L367,80" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#farr)"/>
+      <path d="M502,80 L542,80" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#farr)"/>
+      <!-- Loop back -->
+      <path d="M660,80 C690,80 690,150 340,150 C10,150 10,80 18,80" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,4" fill="none" marker-end="url(#farr)"/>
+      <defs><marker id="farr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <text x="340" y="148" text-anchor="middle" fill="#2563eb" font-size="11">循環執行下一條指令</text>
+    </svg>
+    <div class="caption">每條指令都走 Fetch → Decode → Execute → Store 四步驟</div>
+  </div>
+
+  <h3>詳細範例：執行 <code>LDA ONE</code>（ONE 在位址 0x0030，值為 1）</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>步驟</th><th>PC</th><th>IR（指令暫存器）</th><th>A 暫存器</th><th>動作</th></tr>
+      <tr><td>初始狀態</td><td><code>0x0033</code></td><td><code>???</code></td><td><code>???</code></td><td>—</td></tr>
+      <tr class="highlight-row"><td>① Fetch</td><td><code>0x0036</code></td><td><code>00 00 30</code></td><td><code>???</code></td><td>取出指令，PC += 3</td></tr>
+      <tr><td>② Decode</td><td><code>0x0036</code></td><td><code>00 00 30</code></td><td><code>???</code></td><td>opcode=0x00(LDA), x=0, addr=0x030</td></tr>
+      <tr class="highlight-row"><td>③④ Execute+Store</td><td><code>0x0036</code></td><td><code>00 00 30</code></td><td><code>00 00 01</code></td><td>A ← mem[0x0030] = 1</td></tr>
+    </table>
+  </div>
+
+  <div class="quiz">
+    <div class="quiz-label">🧠 小測驗</div>
+    <div class="quiz-q">
+      以下 24-bit 指令代表什麼？（提示：opcode 0x00 = LDA，x bit 在第 16 位，(X) = 0x0100）<br>
+      <code>0000 0000  1000 0011  0000 0000</code>
+    </div>
+    <details>
+      <summary>查看答案</summary>
+      <div class="answer">
+        opcode = <code>00</code> → LDA<br>
+        x = <code>1</code> → 索引定址<br>
+        address = <code>0000 0011 0000 0000</code> = <code>0x0300</code><br>
+        TA = 0x0300 + (X) = 0x0300 + 0x0100 = <strong>0x0400</strong><br>
+        → A ← mem[0x0400]
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ── 課堂練習 ───────────────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">2026 / 03 / 05 &amp; 03 / 12</span></h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:.75rem;">
+    給定記憶體表，練習解讀 SIC 24-bit 指令並計算目標位址與載入值。
+  </p>
+
+  <div class="box box-info" style="margin-bottom:1rem;">
+    <strong>📋 記憶體表（兩題共用）</strong>
+    <div class="table-wrap" style="margin-top:.6rem;">
+      <table>
+        <tr><th>位址（hex）</th><th>內容（hex）</th></tr>
+        <tr><td>3030</td><td>003600</td></tr>
+        <tr><td>3600</td><td>103000</td></tr>
+        <tr><td>4600</td><td>006390</td></tr>
+        <tr><td>6390</td><td>00C303</td></tr>
+        <tr><td>C303</td><td>003030</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">03/05 Q6 · 20%</div>
+    <div class="p-q">
+      假設暫存器 X = (2FD)₁₆<br>
+      ① 指令 <code>003030₁₆</code>：target address = (　　　)₁₆，A 載入值 = (　　　　)₁₆<br>
+      ② 指令 <code>00B303₁₆</code>：target address = (　　　)₁₆，A 載入值 = (　　　　)₁₆
+    </div>
+    <div class="p-hint">SIC 指令格式：byte0 = opcode，bytes 1-2 的最高位 = x-bit，其餘 15 bits = address field。x=1 時 target = address field + X。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        <strong>① 003030₁₆：</strong><br>
+        opcode = 00（LDA），bytes 1-2 = 0x3030，bit15 = 0 → 直接定址<br>
+        target = <strong>3030₁₆</strong>，A ← memory[3030] = <strong>003600₁₆</strong><br><br>
+        <strong>② 00B303₁₆：</strong><br>
+        bytes 1-2 = 0xB303 = <code>1011 0011 0000 0011</code>₂<br>
+        最高位（bit15）= <strong>1</strong> → x = 1（索引定址）<br>
+        把最高位清掉取得 address field：B303₁₆ 的最高位設 0 → <strong>3303₁₆</strong><br>
+        （技巧：B=1011₂ → 去掉最高位變 011₂ = 3，所以 B303 → 3303）<br>
+        target = 3303 + 2FD = <strong>3600₁₆</strong>，A ← memory[3600] = <strong>103000₁₆</strong>
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">03/12 Q1 · 20%</div>
+    <div class="p-q">
+      假設暫存器 X = (2FB)₁₆<br>
+      ① 指令 <code>003030₁₆</code>：target address = (　　　)₁₆，A 載入值 = (　　　　)₁₆<br>
+      ② 指令 <code>00C305₁₆</code>：target address = (　　　)₁₆，A 載入值 = (　　　　)₁₆
+    </div>
+    <div class="p-hint">0xC305 的最高位 = 1，先算 address field，再加 X。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        <strong>① 003030₁₆：</strong> 同上，target = <strong>3030₁₆</strong>，A = <strong>003600₁₆</strong><br><br>
+        <strong>② 00C305₁₆：</strong><br>
+        bytes 1-2 = 0xC305 = <code>1100 0011 0000 0101</code>₂，最高位 = 1 → x = 1<br>
+        address field：C=1100₂ → 去掉最高位變 100₂ = 4，所以 C305 → <strong>4305₁₆</strong><br>
+        target = 4305 + 2FB = <strong>4600₁₆</strong>，A ← memory[4600] = <strong>006390₁₆</strong>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson1.html" class="nav-btn">
+    <span>←</span>
+    <div><span class="nav-label">上一課</span>數值系統</div>
+  </a>
+  <a href="lesson3.html" class="nav-btn next">
+    <span>→</span>
+    <div><span class="nav-label">下一課</span>SIC/XE 架構</div>
+  </a>
+</div>
+
+</div>
+</body>
+</html>

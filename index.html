@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系統程式 教學網站</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <h1>⚙️ 系統程式 System Programming</h1>
+    <p class="subtitle">國立暨南國際大學 資訊管理系 ｜ 教科書：Leland L. Beck, 3rd Ed.</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="hero">
+    <div class="hero-icon">📚</div>
+    <div>
+      <h2>歡迎來到系統程式教學網站</h2>
+      <p>本課程從電腦底層架構出發，學習組合語言、組譯器設計、載入器與連結器。點選下方課程卡片開始學習，建議按順序讀完每個章節。</p>
+    </div>
+  </div>
+
+  <p class="section-title">📋 課程目錄</p>
+
+  <div class="lessons-grid">
+
+    <a class="lesson-card" href="lesson1.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#2563eb,#7c3aed)">1</div>
+      <div class="card-title">數值系統</div>
+      <div class="card-desc">進位轉換、2's Complement 負數表示、浮點數格式，是後續所有課程的計算基礎。</div>
+      <div class="card-tags">
+        <span class="tag">進位轉換</span>
+        <span class="tag">2's Complement</span>
+        <span class="tag">浮點數</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson2.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#0891b2,#2563eb)">2</div>
+      <div class="card-title">SIC 機器架構</div>
+      <div class="card-desc">SIC 假想電腦的記憶體、暫存器、指令格式與 Fetch-Decode-Execute 執行週期。</div>
+      <div class="card-tags">
+        <span class="tag">暫存器</span>
+        <span class="tag">指令格式</span>
+        <span class="tag">I/O</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson3.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#059669,#0891b2)">3</div>
+      <div class="card-title">SIC/XE 架構</div>
+      <div class="card-desc">SIC 的擴充版本，增加更多暫存器、4 種指令格式，以及更多定址模式。</div>
+      <div class="card-tags">
+        <span class="tag">Format 1-4</span>
+        <span class="tag">新暫存器</span>
+        <span class="tag">更多定址</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson4.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#d97706,#dc2626)">4</div>
+      <div class="card-title">組合語言程式設計</div>
+      <div class="card-desc">組合語言程式的結構（Label / Mnemonic / Operand）、Pseudo 指令與完整程式範例。</div>
+      <div class="card-tags">
+        <span class="tag">Pseudo 指令</span>
+        <span class="tag">程式範例</span>
+        <span class="tag">COPY程式</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson5.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#7c3aed,#db2777)">5</div>
+      <div class="card-title">Two-Pass 組譯器</div>
+      <div class="card-desc">組譯器如何把組合語言轉成目的碼，兩個 Pass 各自的功能與完整演算法。</div>
+      <div class="card-tags">
+        <span class="tag">OPTAB</span>
+        <span class="tag">SYMTAB</span>
+        <span class="tag">Object Program</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson6.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#dc2626,#d97706)">6</div>
+      <div class="card-title">One-Pass & Multi-Pass 組譯器</div>
+      <div class="card-desc">只掃一遍的 One-pass 組譯器如何處理 Forward Reference，以及 Multi-pass 的動機。</div>
+      <div class="card-tags">
+        <span class="tag">Forward Reference</span>
+        <span class="tag">Load-and-go</span>
+        <span class="tag">EQU</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson7.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#0891b2,#059669)">7</div>
+      <div class="card-title">SIC/XE 定址模式</div>
+      <div class="card-desc">PC-relative、Base-relative、Immediate、Indirect、Extended 等定址模式詳解。</div>
+      <div class="card-tags">
+        <span class="tag">PC-relative</span>
+        <span class="tag">Base-relative</span>
+        <span class="tag">nixbpe flags</span>
+      </div>
+    </a>
+
+    <a class="lesson-card" href="lesson8.html" style="text-decoration:none">
+      <div class="card-num" style="background:linear-gradient(135deg,#2563eb,#059669)">8</div>
+      <div class="card-title">程式重定位</div>
+      <div class="card-desc">Absolute vs Relocatable 程式差異、Modification Record 格式與多工程式設計概念。</div>
+      <div class="card-tags">
+        <span class="tag">Relocatable</span>
+        <span class="tag">Modification Record</span>
+        <span class="tag">Multiprogramming</span>
+      </div>
+    </a>
+
+  </div><!-- /.lessons-grid -->
+
+  <div style="margin-top:3rem; padding:1.5rem; background:white; border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow);">
+    <h3 style="font-size:1rem;font-weight:700;color:var(--text-muted);margin-bottom:.75rem;">📌 課程工具提醒</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;font-size:.875rem;">
+      <div><strong>教科書：</strong>Beck, System Software, 3rd Ed.</div>
+      <div><strong>指令集：</strong>SIC / SIC/XE</div>
+      <div><strong>作業語言：</strong>Python</div>
+      <div><strong>參考：</strong>陳鍾誠《系統程式》旗標</div>
+    </div>
+  </div>
+
+</div><!-- /.container -->
+
+</body>
+</html>

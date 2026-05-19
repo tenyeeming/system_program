@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第3課：SIC/XE 架構 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header"><div class="container"><h1>⚙️ 系統程式 System Programming</h1></div></header>
+<nav class="lesson-nav"><div class="nav-inner">
+  <a href="index.html" class="nav-home">🏠 首頁</a>
+  <a href="lesson1.html">1. 數值系統</a><a href="lesson2.html">2. SIC架構</a>
+  <a href="lesson3.html" class="active">3. SIC/XE</a><a href="lesson4.html">4. 組合語言</a>
+  <a href="lesson5.html">5. Two-Pass</a><a href="lesson6.html">6. One-Pass</a>
+  <a href="lesson7.html">7. 定址模式</a><a href="lesson8.html">8. 程式重定位</a>
+</div></nav>
+<div class="lesson-header"><div class="container">
+  <div class="lesson-num">3</div>
+  <div><h1>SIC/XE 架構</h1><div class="lesson-sub">擴充暫存器 ｜ 4種指令格式 ｜ 更多定址模式</div></div>
+</div></div>
+
+<div class="container">
+
+<div class="section">
+  <h2>🚀 1. SIC/XE 是什麼？</h2>
+  <p>SIC/XE（eXtra Equipment）是 SIC 的擴充版，增加了更多功能，更接近真實的現代電腦。</p>
+  <div class="table-wrap"><table>
+    <tr><th>比較項目</th><th>SIC</th><th>SIC/XE</th></tr>
+    <tr><td>記憶體大小</td><td>2¹⁵ bytes</td><td class="highlight-row"><strong>2²⁰ bytes (1 MB)</strong></td></tr>
+    <tr><td>暫存器數量</td><td>5 個</td><td class="highlight-row"><strong>9 個</strong></td></tr>
+    <tr><td>浮點數</td><td>❌ 無</td><td class="highlight-row"><strong>✅ 48-bit</strong></td></tr>
+    <tr><td>指令格式</td><td>1 種（24-bit）</td><td class="highlight-row"><strong>4 種格式</strong></td></tr>
+    <tr><td>定址模式</td><td>Direct, Indexed</td><td class="highlight-row"><strong>6 種</strong></td></tr>
+  </table></div>
+</div>
+
+<div class="section">
+  <h2>📦 2. 新增暫存器</h2>
+  <p>SIC/XE 在 SIC 的 5 個暫存器基礎上，再加 4 個：</p>
+  <div class="diagram">
+    <svg viewBox="0 0 660 230" width="660" height="230" font-family="sans-serif" font-size="13">
+      <text x="330" y="22" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af">SIC/XE 全部暫存器（9 個）</text>
+      <!-- SIC original label -->
+      <rect x="10" y="32" width="90" height="155" rx="6" fill="none" stroke="#2563eb" stroke-dasharray="5,3" stroke-width="1.5"/>
+      <text x="55" y="45" text-anchor="middle" fill="#2563eb" font-size="11">SIC 原有</text>
+      <!-- Registers -->
+      <g font-size="12">
+        <rect x="15" y="50" width="35" height="30" rx="4" fill="#2563eb"/><text x="32" y="71" text-anchor="middle" fill="white" font-weight="bold">A</text>
+        <rect x="55" y="50" width="590" height="30" rx="4" fill="#eff6ff" stroke="#93c5fd"/>
+        <text x="350" y="69" text-anchor="middle" fill="#1e293b">Accumulator — 算術運算（0）</text>
+
+        <rect x="15" y="85" width="35" height="30" rx="4" fill="#7c3aed"/><text x="32" y="106" text-anchor="middle" fill="white" font-weight="bold">X</text>
+        <rect x="55" y="85" width="590" height="30" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>
+        <text x="350" y="104" text-anchor="middle" fill="#1e293b">Index Register — 索引定址（1）</text>
+
+        <rect x="15" y="120" width="35" height="30" rx="4" fill="#0891b2"/><text x="32" y="141" text-anchor="middle" fill="white" font-weight="bold">L</text>
+        <rect x="55" y="120" width="590" height="30" rx="4" fill="#ecfeff" stroke="#67e8f9"/>
+        <text x="350" y="139" text-anchor="middle" fill="#1e293b">Linkage Register — 副程式返回位址（2）</text>
+
+        <rect x="15" y="155" width="35" height="30" rx="4" fill="#059669"/><text x="32" y="173" text-anchor="middle" fill="white" font-size="11" font-weight="bold">PC</text>
+        <rect x="55" y="155" width="590" height="30" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+        <text x="350" y="174" text-anchor="middle" fill="#1e293b">Program Counter — 下一條指令位址（8）</text>
+      </g>
+      <!-- New registers label -->
+      <rect x="10" y="193" width="90" height="32" rx="6" fill="none" stroke="#dc2626" stroke-dasharray="5,3" stroke-width="1.5"/>
+      <text x="55" y="206" text-anchor="middle" fill="#dc2626" font-size="11">SIC/XE</text>
+      <text x="55" y="218" text-anchor="middle" fill="#dc2626" font-size="11">新增</text>
+      <rect x="15" y="194" width="35" height="28" rx="4" fill="#dc2626"/><text x="32" y="213" text-anchor="middle" fill="white" font-size="11" font-weight="bold">B</text>
+      <rect x="55" y="194" width="590" height="28" rx="4" fill="#fef2f2" stroke="#fca5a5"/>
+      <text x="350" y="212" text-anchor="middle" fill="#1e293b">Base Register — Base-relative 定址用（3）｜ S(4) T(5) F(6) SW(9) 略</text>
+    </svg>
+    <div class="caption">重點新增：B（Base Register），用於 base-relative 定址</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📐 3. 四種指令格式</h2>
+  <p>SIC/XE 有 4 種不同長度的指令格式，組譯器根據格式決定指令長度。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 315" width="680" height="315" font-family="monospace" font-size="12">
+      <text x="340" y="20" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af" font-family="sans-serif">SIC/XE 四種指令格式</text>
+
+      <!-- Format 1 -->
+      <text x="20" y="48" fill="#64748b" font-size="12" font-family="sans-serif">Format 1（1 byte = 8 bits）</text>
+      <rect x="20" y="55" width="80" height="35" rx="4" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="60" y="78" text-anchor="middle" fill="#1e40af" font-weight="bold">op (8)</text>
+      <text x="110" y="78" fill="#64748b" font-family="sans-serif">— 無操作數，例：FIX, FLOAT, NORM</text>
+
+      <!-- Format 2 -->
+      <text x="20" y="115" fill="#64748b" font-size="12" font-family="sans-serif">Format 2（2 bytes = 16 bits）</text>
+      <rect x="20"  y="122" width="80"  height="35" rx="4" fill="#fde8ff" stroke="#7c3aed" stroke-width="1.5"/>
+      <rect x="105" y="122" width="55"  height="35" rx="4" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1.5"/>
+      <rect x="165" y="122" width="55"  height="35" rx="4" fill="#f5f3ff" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="60"  y="145" text-anchor="middle" fill="#6d28d9" font-weight="bold">op (8)</text>
+      <text x="132" y="145" text-anchor="middle" fill="#6d28d9">r1 (4)</text>
+      <text x="192" y="145" text-anchor="middle" fill="#6d28d9">r2 (4)</text>
+      <text x="230" y="145" fill="#64748b" font-family="sans-serif">— 暫存器對暫存器，例：ADDR r1,r2</text>
+
+      <!-- Format 3 -->
+      <text x="20" y="185" fill="#64748b" font-size="12" font-family="sans-serif">Format 3（3 bytes = 24 bits）★ 最常用</text>
+      <rect x="20"  y="192" width="80"  height="35" rx="4" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <rect x="105" y="192" width="20"  height="35" rx="0" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <rect x="125" y="192" width="20"  height="35" rx="0" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <rect x="145" y="192" width="20"  height="35" rx="0" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <rect x="165" y="192" width="20"  height="35" rx="0" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <rect x="185" y="192" width="20"  height="35" rx="0" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <rect x="205" y="192" width="20"  height="35" rx="0" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <rect x="225" y="192" width="200" height="35" rx="4" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+      <text x="60"  y="215" text-anchor="middle" fill="#065f46" font-weight="bold">op (6)</text>
+      <text x="115" y="215" text-anchor="middle" fill="#065f46">n</text>
+      <text x="135" y="215" text-anchor="middle" fill="#065f46">i</text>
+      <text x="155" y="215" text-anchor="middle" fill="#065f46">x</text>
+      <text x="175" y="215" text-anchor="middle" fill="#065f46">b</text>
+      <text x="195" y="215" text-anchor="middle" fill="#065f46">p</text>
+      <text x="215" y="215" text-anchor="middle" fill="#065f46">e</text>
+      <text x="325" y="215" text-anchor="middle" fill="#065f46">disp (12)</text>
+      <text x="20"  y="240" fill="#64748b" font-family="sans-serif" font-size="11">nixbpe 旗標決定定址模式，disp 為 12-bit 位移量</text>
+
+      <!-- Format 4 -->
+      <text x="20" y="260" fill="#64748b" font-size="12" font-family="sans-serif">Format 4（4 bytes = 32 bits）— Extended，用 + 前綴，例：+LDA m</text>
+      <rect x="20"  y="267" width="80"  height="35" rx="2" fill="#fff7ed" stroke="#d97706" stroke-width="1.5"/>
+      <rect x="105" y="267" width="110" height="35" rx="0" fill="#fffbeb" stroke="#fbbf24" stroke-width="1"/>
+      <rect x="215" y="267" width="400" height="35" rx="2" fill="#fffbeb" stroke="#fbbf24" stroke-width="1"/>
+      <text x="60"  y="289" text-anchor="middle" fill="#92400e" font-size="11">op (6)</text>
+      <text x="160" y="289" text-anchor="middle" fill="#92400e" font-size="11">nixbpe (6)</text>
+      <text x="415" y="289" text-anchor="middle" fill="#92400e" font-size="11">address (20 bits)</text>
+    </svg>
+    <div class="caption">Format 3 最常用（nixbpe 旗標）；Format 4 用於超出 12-bit 位移量的情況</div>
+  </div>
+
+  <h3>nixbpe 旗標說明</h3>
+  <div class="table-wrap"><table>
+    <tr><th>旗標</th><th>名稱</th><th>說明</th></tr>
+    <tr><td><code>n</code></td><td>indirect</td><td>1 = 間接定址（@m）</td></tr>
+    <tr><td><code>i</code></td><td>immediate</td><td>1 = 立即定址（#c）</td></tr>
+    <tr><td><code>x</code></td><td>indexed</td><td>1 = 索引定址（m,X）</td></tr>
+    <tr><td><code>b</code></td><td>base-relative</td><td>1 = 以 B 暫存器為基底</td></tr>
+    <tr><td><code>p</code></td><td>PC-relative</td><td>1 = 以 PC 為基底</td></tr>
+    <tr class="highlight-row"><td><code>e</code></td><td>extended</td><td>1 = Format 4（20-bit 位址）</td></tr>
+  </table></div>
+
+  <div class="box box-warning">
+    <strong>⚠️ 重要規則</strong>
+    n=1, i=1 且 x=b=p=e=0 → simple direct addressing（一般直接定址）<br>
+    SIC 標準模式：n=1, i=1（為了向下相容，SIC 格式翻譯成 SIC/XE 時這樣設）
+  </div>
+</div>
+
+<!-- ── 課堂練習 ───────────────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">條件判斷翻譯</span></h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1rem;">
+    把 C 語言的 if-else 翻譯成 SIC 與 SIC/XE 組合語言，是最常見的課堂題型。
+  </p>
+
+  <div class="practice">
+    <div class="p-num">題目 · 40%</div>
+    <div class="p-q">將下列 C 程式片段翻譯成 SIC 組合語言（左欄），再翻譯成 SIC/XE（右欄）：</div>
+<pre style="margin:.5rem 0 .75rem;">int num = 49;  char rflag;
+if (num == 49)
+    rflag = 'T';     // 'T' ASCII = 84
+else
+    rflag = 'F';     // 'F' ASCII = 70
+rflag = 'X';         // 'X' ASCII = 88</pre>
+    <div class="p-hint">SIC 沒有立即定址，所以比較常數需先宣告成 WORD。SIC/XE 可用 # 立即定址或 LDCH #imm。注意：rflag='X' 一定會執行，不管 if 條件是否成立。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        <strong>SIC 版本：</strong>
+        <em style="font-size:.85rem;">LDCH = Load CHaracter，把 1 byte 載入 A 的最低 8 bits；STCH = Store CHaracter，把 A 的最低 8 bits 寫入記憶體 1 byte。char 用這兩個指令，不用 LDA/STA（那兩個是處理 3 bytes 的 word）。</em>
+<pre>       LDA   NUM
+       COMP  I49       ; 比較 A 與 49
+       JEQ   SETTRUE   ; 相等跳去設 'T'
+       LDCH  CHARF     ; else：把 'F' 這個字元載進 A
+       STCH  RFLAG     ;        再把 A 存到 rflag 的記憶體位置
+       J     SETX      ; 跳過 then 區段（否則會掉落執行 SETTRUE）
+SETTRUE LDCH CHART     ; then：把 'T' 載進 A
+       STCH  RFLAG     ;        存到 rflag
+SETX   LDCH  CHARX     ; 一定執行：把 'X' 載進 A
+       STCH  RFLAG     ;            存到 rflag
+
+CHARX  BYTE  C'X'      ; ASCII 88
+CHART  BYTE  C'T'      ; ASCII 84
+CHARF  BYTE  C'F'      ; ASCII 70
+NUM    WORD  49
+RFLAG  RESB  1
+I49    WORD  49</pre>
+        <strong>SIC/XE 版本</strong>（利用立即定址簡化）：
+<pre>       LDA   NUM
+       COMP  #49       ; 立即比較，不需宣告 I49
+       JEQ   SETTRUE
+       LDCH  #70       ; 'F' = 70
+       STCH  RFLAG
+       J     SETX
+SETTRUE LDCH #84       ; 'T' = 84
+       STCH  RFLAG
+SETX   LDCH  #88       ; 'X' = 88
+       STCH  RFLAG
+
+NUM    WORD  49
+RFLAG  RESB  1</pre>
+        <em>執行流程（num = 49 時）：COMP I49 → 相等 → JEQ 跳到 SETTRUE → 存 'T' → 自然落下到 SETX → 存 'X'。</em><br>
+        <em>執行流程（num ≠ 49 時）：COMP I49 → 不相等 → 不跳，繼續執行 → 存 'F' → J SETX 強制跳過 SETTRUE → 存 'X'。</em><br>
+        <em>如果不加 J SETX，num≠49 時會繼續執行 SETTRUE 的程式碼，把 'T' 蓋掉 'F'，這是常見錯誤。</em>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson2.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>SIC 架構</div></a>
+  <a href="lesson4.html" class="nav-btn next"><span>→</span><div><span class="nav-label">下一課</span>組合語言程式設計</div></a>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第1課：數值系統 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <h1>⚙️ 系統程式 System Programming</h1>
+  </div>
+</header>
+
+<nav class="lesson-nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-home">🏠 首頁</a>
+    <a href="lesson1.html" class="active">1. 數值系統</a>
+    <a href="lesson2.html">2. SIC架構</a>
+    <a href="lesson3.html">3. SIC/XE</a>
+    <a href="lesson4.html">4. 組合語言</a>
+    <a href="lesson5.html">5. Two-Pass</a>
+    <a href="lesson6.html">6. One-Pass</a>
+    <a href="lesson7.html">7. 定址模式</a>
+    <a href="lesson8.html">8. 程式重定位</a>
+  </div>
+</nav>
+
+<div class="lesson-header">
+  <div class="container">
+    <div class="lesson-num">1</div>
+    <div>
+      <h1>數值系統 Number Systems</h1>
+      <div class="lesson-sub">進位轉換 ｜ 2's Complement ｜ 浮點數表示法</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ── 1. 進位系統 ─────────────────────────────────────── -->
+<div class="section">
+  <h2>🔢 1. 常見進位系統</h2>
+  <p>電腦底層只有 0 和 1，但我們用不同進位來表示資料。要能在這四種進位之間自由換算。</p>
+
+  <div class="table-wrap">
+    <table>
+      <tr><th>進位</th><th>名稱</th><th>使用的符號</th><th>範例</th></tr>
+      <tr><td><strong>2</strong></td><td>二進位 Binary</td><td>0, 1</td><td>1010₂ = 10₁₀</td></tr>
+      <tr><td><strong>8</strong></td><td>八進位 Octal</td><td>0–7</td><td>12₈ = 10₁₀</td></tr>
+      <tr><td><strong>10</strong></td><td>十進位 Decimal</td><td>0–9</td><td>10₁₀</td></tr>
+      <tr class="highlight-row"><td><strong>16</strong></td><td>十六進位 Hex</td><td>0–9, A–F</td><td>A₁₆ = 10₁₀</td></tr>
+    </table>
+  </div>
+
+  <div class="box box-info">
+    <strong>💡 為什麼十六進位很重要？</strong>
+    4 個 bit 剛好可以用一個 hex 字元表示，所以機器碼通常用 hex 寫，例如 opcode <code>LDA = 00</code>。
+  </div>
+
+  <!-- 對照表 -->
+  <h3>四進位對照表（0–16）</h3>
+  <div class="diagram">
+    <svg viewBox="0 0 700 220" width="700" height="220" font-family="monospace" font-size="13">
+      <!-- Header -->
+      <rect x="0" y="0" width="700" height="30" fill="#2563eb" rx="6"/>
+      <text x="50"  y="20" fill="white" font-weight="bold">十進位</text>
+      <text x="220" y="20" fill="white" font-weight="bold">二進位（4 bit）</text>
+      <text x="420" y="20" fill="white" font-weight="bold">八進位</text>
+      <text x="570" y="20" fill="white" font-weight="bold">十六進位</text>
+      <!-- Rows -->
+      <g fill="#1e293b" font-size="12">
+        <!-- 0-8 -->
+        <text x="50"  y="50">0</text> <text x="220" y="50">0000</text> <text x="420" y="50">0</text> <text x="570" y="50">0</text>
+        <text x="50"  y="68">1</text> <text x="220" y="68">0001</text> <text x="420" y="68">1</text> <text x="570" y="68">1</text>
+        <text x="50"  y="86">2</text> <text x="220" y="86">0010</text> <text x="420" y="86">2</text> <text x="570" y="86">2</text>
+        <text x="50" y="104">3</text> <text x="220" y="104">0011</text> <text x="420" y="104">3</text> <text x="570" y="104">3</text>
+        <text x="50" y="122">4</text> <text x="220" y="122">0100</text> <text x="420" y="122">4</text> <text x="570" y="122">4</text>
+        <text x="50" y="140">5</text> <text x="220" y="140">0101</text> <text x="420" y="140">5</text> <text x="570" y="140">5</text>
+        <text x="50" y="158">6</text> <text x="220" y="158">0110</text> <text x="420" y="158">6</text> <text x="570" y="158">6</text>
+        <text x="50" y="176">7</text> <text x="220" y="176">0111</text> <text x="420" y="176">7</text> <text x="570" y="176">7</text>
+        <text x="50" y="194">8</text> <text x="220" y="194">1000</text> <text x="420" y="194">10</text> <text x="570" y="194">8</text>
+      </g>
+      <!-- column separators -->
+      <line x1="170" y1="0" x2="170" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+      <line x1="370" y1="0" x2="370" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+      <line x1="520" y1="0" x2="520" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+      <!-- row separators -->
+      <line x1="0" y1="30" x2="700" y2="30" stroke="#e2e8f0" stroke-width="1"/>
+    </svg>
+    <svg viewBox="0 0 700 220" width="700" height="220" font-family="monospace" font-size="13">
+      <g fill="#1e293b" font-size="12">
+        <text x="50"  y="20">9</text>  <text x="220" y="20">1001</text> <text x="420" y="20">11</text> <text x="570" y="20">9</text>
+        <text x="50"  y="38">10</text> <text x="220" y="38">1010</text> <text x="420" y="38">12</text> <text x="570" y="38" fill="#dc2626" font-weight="bold">A</text>
+        <text x="50"  y="56">11</text> <text x="220" y="56">1011</text> <text x="420" y="56">13</text> <text x="570" y="56" fill="#dc2626" font-weight="bold">B</text>
+        <text x="50"  y="74">12</text> <text x="220" y="74">1100</text> <text x="420" y="74">14</text> <text x="570" y="74" fill="#dc2626" font-weight="bold">C</text>
+        <text x="50"  y="92">13</text> <text x="220" y="92">1101</text> <text x="420" y="92">15</text> <text x="570" y="92" fill="#dc2626" font-weight="bold">D</text>
+        <text x="50" y="110">14</text> <text x="220" y="110">1110</text> <text x="420" y="110">16</text> <text x="570" y="110" fill="#dc2626" font-weight="bold">E</text>
+        <text x="50" y="128">15</text> <text x="220" y="128">1111</text> <text x="420" y="128">17</text> <text x="570" y="128" fill="#dc2626" font-weight="bold">F</text>
+        <text x="50" y="146">16</text> <text x="220" y="146">1 0000</text> <text x="420" y="146">20</text> <text x="570" y="146">10</text>
+      </g>
+      <line x1="170" y1="0" x2="170" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+      <line x1="370" y1="0" x2="370" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+      <line x1="520" y1="0" x2="520" y2="220" stroke="#e2e8f0" stroke-width="1"/>
+    </svg>
+    <div class="caption">十進位 0–16 的四進位對照（紅色為 A-F）</div>
+  </div>
+</div>
+
+<!-- ── 2. 進位轉換 ─────────────────────────────────────── -->
+<div class="section">
+  <h2>🔄 2. 進位轉換方法</h2>
+
+  <h3>十進位 → 二進位（除 2 取餘數）</h3>
+  <p>整數部分一直除以 2，記下餘數，<strong>由下往上讀</strong>就是答案。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 500 250" width="500" height="250" font-family="sans-serif" font-size="14">
+      <!-- Title -->
+      <text x="250" y="25" text-anchor="middle" font-weight="bold" font-size="16" fill="#1e40af">25₁₀ → 二進位</text>
+      <!-- Division steps -->
+      <g fill="#1e293b">
+        <text x="120" y="60">25 ÷ 2 = 12</text>  <text x="280" y="60" fill="#dc2626" font-weight="bold">餘 1</text>
+        <text x="120" y="90">12 ÷ 2 =  6</text>  <text x="280" y="90" fill="#dc2626" font-weight="bold">餘 0</text>
+        <text x="120" y="120"> 6 ÷ 2 =  3</text> <text x="280" y="120" fill="#dc2626" font-weight="bold">餘 0</text>
+        <text x="120" y="150"> 3 ÷ 2 =  1</text> <text x="280" y="150" fill="#dc2626" font-weight="bold">餘 1</text>
+        <text x="120" y="180"> 1 ÷ 2 =  0</text> <text x="280" y="180" fill="#dc2626" font-weight="bold">餘 1</text>
+      </g>
+      <!-- Arrow pointing upward -->
+      <path d="M340,180 L340,60" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+      <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#7c3aed"/></marker></defs>
+      <text x="355" y="130" fill="#7c3aed" font-size="12">由下往上讀</text>
+      <!-- Result -->
+      <rect x="130" y="205" width="240" height="32" rx="8" fill="#eff6ff" stroke="#2563eb"/>
+      <text x="250" y="226" text-anchor="middle" font-weight="bold" fill="#1e40af" font-size="15">25₁₀ = 11001₂</text>
+    </svg>
+    <div class="caption">除 2 取餘數法（由下往上讀結果）</div>
+  </div>
+
+  <h3>二進位 ↔ 十六進位（4 bits 一組）</h3>
+  <p>每 4 個 bit 對應 1 個 hex 字元，轉換非常快速。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 560 130" width="560" height="130" font-family="monospace" font-size="16">
+      <!-- Binary -->
+      <text x="30"  y="35" fill="#1e293b">1010</text>
+      <text x="120" y="35" fill="#1e293b">1111</text>
+      <!-- Brackets -->
+      <rect x="20"  y="42" width="72" height="20" rx="4" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <rect x="110" y="42" width="72" height="20" rx="4" fill="#fde8ff" stroke="#7c3aed" stroke-width="1.5"/>
+      <!-- Labels -->
+      <text x="56"  y="57" text-anchor="middle" fill="#1e40af" font-size="13">= A</text>
+      <text x="146" y="57" text-anchor="middle" fill="#6d28d9" font-size="13">= F</text>
+      <!-- Arrow -->
+      <text x="200" y="58" fill="#64748b" font-size="20">→</text>
+      <!-- Result -->
+      <rect x="235" y="38" width="90" height="32" rx="8" fill="#1e40af"/>
+      <text x="280" y="59" text-anchor="middle" fill="white" font-weight="bold" font-size="18">AF₁₆</text>
+      <!-- Reverse example -->
+      <text x="30"  y="110" fill="#64748b" font-size="13">反過來：2A₁₆ → 0010 1010₂</text>
+      <text x="30"  y="130" fill="#64748b" font-size="12">    2 = 0010，A = 1010</text>
+    </svg>
+    <div class="caption">4 bits ↔ 1 hex 字元（最快速的換算方式）</div>
+  </div>
+</div>
+
+<!-- ── 3. 2's Complement ──────────────────────────────── -->
+<div class="section">
+  <h2>➖ 3. 負數表示：2's Complement（二補數）</h2>
+  <p>電腦用 2's complement 表示負整數，因為它只有一個零，而且加法電路最簡單。</p>
+
+  <h3>三種方法比較</h3>
+  <div class="table-wrap">
+    <table>
+      <tr><th>方法</th><th>+3（4-bit）</th><th>-3（4-bit）</th><th>問題</th><th>電腦使用？</th></tr>
+      <tr><td>Sign-Magnitude</td><td>0011</td><td>1011</td><td>+0 和 -0 兩種表示</td><td>❌</td></tr>
+      <tr><td>1's Complement</td><td>0011</td><td>1100</td><td>+0 和 -0 兩種表示</td><td>❌</td></tr>
+      <tr class="highlight-row"><td>2's Complement</td><td>0011</td><td>1101</td><td>無（只有一個零）</td><td>✅</td></tr>
+    </table>
+  </div>
+
+  <h3>如何計算 2's Complement</h3>
+
+  <div class="diagram">
+    <svg viewBox="0 0 700 200" width="700" height="200" font-family="monospace" font-size="14">
+      <!-- Step 1 -->
+      <rect x="20" y="60" width="160" height="80" rx="10" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+      <text x="100" y="88" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="13">Step 1：正數</text>
+      <text x="100" y="115" text-anchor="middle" fill="#1e293b" font-size="16">0001 1001</text>
+      <text x="100" y="135" text-anchor="middle" fill="#64748b" font-size="12">+25₁₀</text>
+      <!-- Arrow 1 -->
+      <path d="M185,100 L235,100" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+      <text x="210" y="92" text-anchor="middle" fill="#64748b" font-size="11">取反</text>
+      <defs><marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <!-- Step 2 -->
+      <rect x="240" y="60" width="160" height="80" rx="10" fill="#fdf4ff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="320" y="88" text-anchor="middle" fill="#6d28d9" font-weight="bold" font-size="13">Step 2：1's complement</text>
+      <text x="320" y="115" text-anchor="middle" fill="#1e293b" font-size="16">1110 0110</text>
+      <text x="320" y="135" text-anchor="middle" fill="#64748b" font-size="12">所有位元反轉</text>
+      <!-- Arrow 2 -->
+      <path d="M405,100 L455,100" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+      <text x="430" y="92" text-anchor="middle" fill="#64748b" font-size="11">+1</text>
+      <!-- Step 3 -->
+      <rect x="460" y="60" width="220" height="80" rx="10" fill="#f0fdf4" stroke="#059669" stroke-width="2"/>
+      <text x="570" y="88" text-anchor="middle" fill="#065f46" font-weight="bold" font-size="13">Step 3：2's complement</text>
+      <text x="570" y="115" text-anchor="middle" fill="#1e293b" font-size="16">1110 0111</text>
+      <text x="570" y="135" text-anchor="middle" fill="#065f46" font-size="12">= -25₁₀ ✓</text>
+      <!-- Title -->
+      <text x="350" y="25" text-anchor="middle" font-weight="bold" font-size="16" fill="#1e40af">8-bit 2's Complement：-25₁₀</text>
+      <!-- Verify -->
+      <text x="350" y="185" text-anchor="middle" fill="#64748b" font-size="12">驗算：0001 1001 + 1110 0111 = 1 0000 0000 → 進位捨棄 → 0000 0000 ✓</text>
+    </svg>
+    <div class="caption">2's Complement 計算步驟：正數 → 取反 → 加 1</div>
+  </div>
+
+  <div class="box box-tip">
+    <strong>🎯 快速技巧</strong>
+    從右邊找到第一個 1，保留它和右邊的所有 0，其餘全部反轉。<br>
+    例：<code>0001 1000</code> → 第一個 1 在第 4 位 → <code>1110 1000</code>
+  </div>
+
+  <div class="quiz">
+    <div class="quiz-label">🧠 小測驗</div>
+    <div class="quiz-q">8-bit 2's Complement 中，<code>11111101</code> 是十進位幾？</div>
+    <details>
+      <summary>查看答案</summary>
+      <div class="answer">
+        MSB = 1，所以是負數。取 2's complement：<code>00000010</code> + 1 = <code>00000011</code> = 3<br>
+        所以 <code>11111101</code> = <strong>-3</strong>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ── 4. 浮點數 ───────────────────────────────────────── -->
+<div class="section">
+  <h2>🌊 4. 浮點數表示法（IEEE 32-bit）</h2>
+  <p>整數不夠用，小數需要浮點數。32-bit 單精度浮點數分成三個欄位：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 700 140" width="700" height="140" font-family="monospace" font-size="14">
+      <!-- Fields -->
+      <rect x="20"  y="40" width="60"  height="50" rx="4" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+      <rect x="85"  y="40" width="200" height="50" rx="4" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <rect x="290" y="40" width="390" height="50" rx="4" fill="#f0fdf4" stroke="#059669" stroke-width="2"/>
+      <!-- Labels inside -->
+      <text x="50"  y="62" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="13">S</text>
+      <text x="185" y="62" text-anchor="middle" fill="#92400e" font-weight="bold" font-size="13">Exponent (E)</text>
+      <text x="485" y="62" text-anchor="middle" fill="#065f46" font-weight="bold" font-size="13">Mantissa (M)</text>
+      <text x="50"  y="80" text-anchor="middle" fill="#dc2626" font-size="12">1 bit</text>
+      <text x="185" y="80" text-anchor="middle" fill="#92400e" font-size="12">8 bits</text>
+      <text x="485" y="80" text-anchor="middle" fill="#065f46" font-size="12">23 bits</text>
+      <!-- Labels below -->
+      <text x="50"  y="115" text-anchor="middle" fill="#64748b" font-size="11">符號</text>
+      <text x="185" y="115" text-anchor="middle" fill="#64748b" font-size="11">偏差指數 (bias=127)</text>
+      <text x="485" y="115" text-anchor="middle" fill="#64748b" font-size="11">小數部分（正規化後 1.xxx × 2ⁿ）</text>
+      <!-- Total label -->
+      <text x="350" y="20" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="15">IEEE 754 單精度浮點數（32 bits）</text>
+    </svg>
+    <div class="caption">S = 符號位，E = 偏差指數（真實指數 = E - 127），M = 尾數</div>
+  </div>
+
+  <h3>範例：17.75₁₀ 轉成 32-bit 浮點數</h3>
+  <ol class="steps">
+    <li>
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">轉成二進位</div>
+        17 = 10001₂，0.75 = 0.11₂ → <strong>17.75 = 10001.11₂</strong>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">正規化（Normalize）</div>
+        <code>10001.11 = 1.000111 × 2⁴</code>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">計算各欄位</div>
+        S = 0（正數）｜ E = 4 + 127 = 131 = <code>10000011</code>₂ ｜ M = <code>00011100000000000000000</code>
+      </div>
+    </li>
+    <li>
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">組合結果</div>
+        <code>0 10000011 00011100000000000000000</code>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<!-- ── 課堂練習 (2026/03/05) ────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">2026 / 03 / 05</span></h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1rem;">
+    以下題目直接來自課堂隨堂作業，試著自己算完再展開答案。
+  </p>
+
+  <div class="practice">
+    <div class="p-num">Q1 · 10%</div>
+    <div class="p-q">(38)₁₀ = (　　　)₂ = (　　)₁₆</div>
+    <div class="p-hint">整數轉二進位：一直除以 2 取餘數，由下往上讀。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        38 = 32 + 4 + 2 = 2⁵ + 2² + 2¹<br>
+        → <strong>100110₂</strong><br><br>
+        hex：38 ÷ 16 = 2 餘 6 → <strong>26₁₆</strong><br>
+        驗算：2×16 + 6 = 38 ✓
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">Q2 · 10%</div>
+    <div class="p-q">(388)₁₀ = (　　　)₁₆ = (　　　　　　)₂</div>
+    <div class="p-hint">先轉 hex 最快：388 ÷ 16 兩次。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        388 ÷ 16 = 24 餘 <strong>4</strong>；24 ÷ 16 = 1 餘 <strong>8</strong><br>
+        → <strong>184₁₆</strong><br><br>
+        hex 轉 binary（每個 hex 字元 = 4 bits）：<br>
+        1 = 0001，8 = 1000，4 = 0100<br>
+        → <strong>1 1000 0100₂</strong>
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">Q3 · 10%</div>
+    <div class="p-q">(38.75)₁₀ = (　　　　　　)₂ = (　　　　)₁₆</div>
+    <div class="p-hint">整數部分和小數部分分開轉，再組合。小數乘以 2 取整數位。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        整數部分：38 = <strong>100110₂</strong>（同 Q1）<br>
+        小數部分：0.75 × 2 = <strong>1</strong>.5 → 0.5 × 2 = <strong>1</strong>.0<br>
+        → 0.75₁₀ = 0.11₂<br><br>
+        合併：<strong>100110.11₂</strong><br><br>
+        hex：整數 38 = 26₁₆；小數 0.75 × 16 = 12 = C₁₆<br>
+        → <strong>26.C₁₆</strong>
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">Q4 · 10%</div>
+    <div class="p-q">使用 8 位元之 2 補數表示法，(-38)₁₀ = (　　　　　　　　)₂</div>
+    <div class="p-hint">步驟：先寫出 +38 的二進位，取 1's complement，再加 1。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        +38 = <code>0010 0110</code><br>
+        取反（1's complement）= <code>1101 1001</code><br>
+        加 1 = <strong><code>1101 1010</code></strong><br><br>
+        驗算：1101 1010₂ = 218₁₀，256 − 38 = 218 ✓<br>
+        快速技巧：從最右邊開始，找到第一個 1，把這個 1 和它右邊的所有 bit 原封不動保留，其餘左邊的 bit 全部翻轉。<br>
+        範例：0010 <u>0110</u> → 最右邊的 1 在第 1 位 → 保留「10」，翻轉左邊「00100」→「11011」→ 結果：1101 1010
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">Q5 · 20%</div>
+    <div class="p-q">
+      若某變數的記憶體位址在 2¹⁰ 的地方，以 16 進位表示為：(　　　　)₁₆<br>
+      若某變數的記憶體位址在 2²⁰ 的地方，以 16 進位表示為：(　　　　　　　)₁₆
+    </div>
+    <div class="p-hint">2 的次方轉 hex：先算出十進位值，再轉。或用二進位看幾個 4-bit 組。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        2¹⁰ = 1024₁₀<br>
+        1024 = 0100 0000 0000₂ → 每 4 位一組 = <strong>400₁₆</strong><br><br>
+        2²⁰ = 1048576₁₀<br>
+        2²⁰ = 1 後面 20 個零的二進位 → 20 ÷ 4 = 5 組 hex 零<br>
+        → <strong>100000₁₆</strong>（即 0x100000）<br><br>
+        <em>注意：SIC 記憶體只有 2¹⁵ bytes（最大 7FFF₁₆），所以 2²⁰ 位址在 SIC/XE 才合法。</em>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ── Bottom Nav ─────────────────────────────────────── -->
+<div class="lesson-nav-bottom">
+  <a href="index.html" class="nav-btn">
+    <span>🏠</span>
+    <div><span class="nav-label">返回</span>課程目錄</div>
+  </a>
+  <a href="lesson2.html" class="nav-btn next">
+    <span>→</span>
+    <div><span class="nav-label">下一課</span>SIC 機器架構</div>
+  </a>
+</div>
+
+</div><!-- /.container -->
+</body>
+</html>

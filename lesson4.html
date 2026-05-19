@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第4課：組合語言程式設計 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header"><div class="container"><h1>⚙️ 系統程式 System Programming</h1></div></header>
+<nav class="lesson-nav"><div class="nav-inner">
+  <a href="index.html" class="nav-home">🏠 首頁</a>
+  <a href="lesson1.html">1. 數值系統</a><a href="lesson2.html">2. SIC架構</a>
+  <a href="lesson3.html">3. SIC/XE</a><a href="lesson4.html" class="active">4. 組合語言</a>
+  <a href="lesson5.html">5. Two-Pass</a><a href="lesson6.html">6. One-Pass</a>
+  <a href="lesson7.html">7. 定址模式</a><a href="lesson8.html">8. 程式重定位</a>
+</div></nav>
+<div class="lesson-header"><div class="container">
+  <div class="lesson-num">4</div>
+  <div><h1>組合語言程式設計</h1><div class="lesson-sub">程式結構 ｜ Pseudo 指令 ｜ 完整範例</div></div>
+</div></div>
+
+<div class="container">
+
+<!-- 程式結構 -->
+<div class="section">
+  <h2>📝 1. 組合語言程式的結構</h2>
+  <p>每一行組合語言程式由三個欄位組成：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 660 120" width="660" height="120" font-family="monospace" font-size="14">
+      <text x="330" y="20" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af" font-family="sans-serif">一行組合語言的結構</text>
+      <!-- Fields -->
+      <rect x="20"  y="30" width="120" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <rect x="160" y="30" width="180" height="50" rx="8" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <rect x="360" y="30" width="200" height="50" rx="8" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <rect x="580" y="30" width="70"  height="50" rx="8" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <!-- Labels -->
+      <text x="80"  y="52" text-anchor="middle" fill="#1e40af" font-weight="bold">LABEL</text>
+      <text x="80"  y="68" text-anchor="middle" fill="#64748b" font-size="11">可省略</text>
+      <text x="250" y="52" text-anchor="middle" fill="#6d28d9" font-weight="bold">MNEMONIC</text>
+      <text x="250" y="68" text-anchor="middle" fill="#64748b" font-size="11">指令或虛擬指令</text>
+      <text x="460" y="52" text-anchor="middle" fill="#065f46" font-weight="bold">OPERAND</text>
+      <text x="460" y="68" text-anchor="middle" fill="#64748b" font-size="11">操作對象</text>
+      <text x="615" y="52" text-anchor="middle" fill="#92400e" font-weight="bold">. 註解</text>
+      <text x="615" y="68" text-anchor="middle" fill="#64748b" font-size="11">可省略</text>
+      <!-- Example -->
+      <text x="80"  y="105" text-anchor="middle" fill="#2563eb" font-size="12">FIRST</text>
+      <text x="250" y="105" text-anchor="middle" fill="#7c3aed" font-size="12">STL</text>
+      <text x="460" y="105" text-anchor="middle" fill="#059669" font-size="12">RETADR</text>
+      <text x="615" y="105" text-anchor="middle" fill="#d97706" font-size="12">. save ret</text>
+    </svg>
+    <div class="caption">Label（可省略）｜ Mnemonic ｜ Operand ｜ 註解（.開頭，可省略）</div>
+  </div>
+
+  <div class="box box-info">
+    <strong>📌 判斷 Label 有沒有的方法</strong>
+    看這行的<strong>第一個字元是不是空白（space 或 tab）</strong>。<br>
+    是空白 → 沒有 Label，第一個 token 是 mnemonic<br>
+    不是空白 → 有 Label，第一個 token 是 label，第二個是 mnemonic
+  </div>
+</div>
+
+<!-- Pseudo 指令 -->
+<div class="section">
+  <h2>🔧 2. Assembler Directives（虛擬指令）</h2>
+  <p>這些指令<strong>不會產生機器碼</strong>，是給組譯器看的控制指令：</p>
+
+  <div class="table-wrap"><table>
+    <tr><th>指令</th><th>用途</th><th>範例</th><th>佔幾 bytes</th></tr>
+    <tr><td><code>START</code></td><td>程式起始位址</td><td><code>PROG START 1000</code></td><td>0</td></tr>
+    <tr><td><code>END</code></td><td>程式結束，指定第一條執行指令</td><td><code>END FIRST</code></td><td>0</td></tr>
+    <tr class="highlight-row"><td><code>BYTE</code></td><td>定義 byte 常數</td><td><code>EOF BYTE C'EOF'</code></td><td>字串長度</td></tr>
+    <tr><td><code>WORD</code></td><td>定義 word（3 bytes）整數常數</td><td><code>THREE WORD 3</code></td><td>3</td></tr>
+    <tr class="highlight-row"><td><code>RESB</code></td><td>保留 N 個 bytes</td><td><code>BUFFER RESB 4096</code></td><td>N</td></tr>
+    <tr><td><code>RESW</code></td><td>保留 N 個 words（N×3 bytes）</td><td><code>TABLE RESW 100</code></td><td>N×3</td></tr>
+  </table></div>
+
+  <h3>BYTE 的兩種寫法</h3>
+  <pre><code><span class="lbl">EOF</span>    <span class="op">BYTE</span>  C'EOF'     <span class="cm">. 字元常數，3 bytes（E, O, F 的 ASCII）</span>
+<span class="lbl">MASK</span>   <span class="op">BYTE</span>  X'F1'     <span class="cm">. 十六進位常數，1 byte（= 0xF1）</span></code></pre>
+</div>
+
+<!-- 完整範例 COPY 程式 -->
+<div class="section">
+  <h2>💻 3. 完整範例：COPY 程式</h2>
+  <p>這是教科書 Fig. 2.1 的完整 SIC 組合語言程式，從輸入裝置讀一筆紀錄，寫到輸出裝置：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 130" width="680" height="130" font-family="sans-serif" font-size="13">
+      <text x="340" y="20" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">COPY 程式架構</text>
+      <rect x="20"  y="35" width="120" height="60" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="80" y="62" text-anchor="middle" fill="#1e40af" font-weight="bold">主程式</text>
+      <text x="80" y="80" text-anchor="middle" fill="#64748b" font-size="11">FIRST...ENDFIL</text>
+      <path d="M145,65 L195,65" stroke="#64748b" stroke-width="1.5" marker-end="url(#la)"/>
+      <defs><marker id="la" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <rect x="200" y="35" width="140" height="60" rx="10" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="270" y="56" text-anchor="middle" fill="#6d28d9" font-weight="bold">RDREC 副程式</text>
+      <text x="270" y="74" text-anchor="middle" fill="#64748b" font-size="11">從輸入裝置讀一筆紀錄</text>
+      <path d="M345,65 L395,65" stroke="#64748b" stroke-width="1.5" marker-end="url(#la)"/>
+      <rect x="400" y="35" width="140" height="60" rx="10" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <text x="470" y="56" text-anchor="middle" fill="#065f46" font-weight="bold">WRREC 副程式</text>
+      <text x="470" y="74" text-anchor="middle" fill="#64748b" font-size="11">把紀錄寫到輸出裝置</text>
+      <!-- Loop arrow -->
+      <path d="M340,100 C340,115 80,115 80,100" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4,3" fill="none" marker-end="url(#la)"/>
+      <text x="210" y="118" text-anchor="middle" fill="#2563eb" font-size="11">重複到 EOF</text>
+    </svg>
+    <div class="caption">主程式呼叫兩個副程式循環讀寫，直到遇到 EOF</div>
+  </div>
+
+<pre><code><span class="cm">. 主程式</span>
+<span class="lbl">COPY</span>   <span class="op">START</span>  <span class="num">1000</span>       <span class="cm">. 程式起始位址 0x1000</span>
+<span class="lbl">FIRST</span>  <span class="op">STL</span>   RETADR      <span class="cm">. 儲存返回位址</span>
+<span class="lbl">CLOOP</span>  <span class="op">JSUB</span>  RDREC       <span class="cm">. 呼叫 RDREC 讀一筆紀錄</span>
+       <span class="op">LDA</span>   LENGTH      <span class="cm">. 檢查讀取長度</span>
+       <span class="op">COMP</span>  ZERO
+       <span class="op">JEQ</span>   ENDFIL      <span class="cm">. 長度=0 表示 EOF</span>
+       <span class="op">JSUB</span>  WRREC       <span class="cm">. 呼叫 WRREC 寫出紀錄</span>
+       <span class="op">J</span>     CLOOP       <span class="cm">. 繼續下一筆</span>
+<span class="lbl">ENDFIL</span> <span class="op">LDA</span>   EOF
+       <span class="op">STA</span>   BUFFER
+       <span class="op">LDA</span>   THREE
+       <span class="op">STA</span>   LENGTH
+       <span class="op">JSUB</span>  WRREC
+       <span class="op">LDL</span>   RETADR
+       <span class="op">RSUB</span>
+
+<span class="cm">. 資料定義</span>
+<span class="lbl">EOF</span>    <span class="op">BYTE</span>  C'EOF'
+<span class="lbl">THREE</span>  <span class="op">WORD</span>  <span class="num">3</span>
+<span class="lbl">ZERO</span>   <span class="op">WORD</span>  <span class="num">0</span>
+<span class="lbl">RETADR</span> <span class="op">RESW</span>  <span class="num">1</span>
+<span class="lbl">LENGTH</span> <span class="op">RESW</span>  <span class="num">1</span>
+<span class="lbl">BUFFER</span> <span class="op">RESB</span>  <span class="num">4096</span>
+
+<span class="cm">. RDREC 副程式（從輸入裝置讀一筆紀錄到 BUFFER）</span>
+<span class="lbl">RDREC</span>  <span class="op">LDX</span>   ZERO
+       <span class="op">LDA</span>   ZERO
+<span class="lbl">RLOOP</span>  <span class="op">TD</span>    INPUT        <span class="cm">. 測試裝置是否就緒</span>
+       <span class="op">JEQ</span>   RLOOP        <span class="cm">. 未就緒，繼續等</span>
+       <span class="op">RD</span>    INPUT        <span class="cm">. 讀 1 byte 到 A</span>
+       <span class="op">COMP</span>  ZERO         <span class="cm">. 檢查是否為 null (0x00)</span>
+       <span class="op">JEQ</span>   EXIT
+       <span class="op">STCH</span>  BUFFER,X     <span class="cm">. 存到 BUFFER[X]（索引定址）</span>
+       <span class="op">TIX</span>   MAXLEN       <span class="cm">. X++，若 X < MAXLEN 繼續</span>
+       <span class="op">JLT</span>   RLOOP
+<span class="lbl">EXIT</span>   <span class="op">STX</span>   LENGTH
+       <span class="op">RSUB</span>
+<span class="lbl">INPUT</span>  <span class="op">BYTE</span>  X'F1'
+<span class="lbl">MAXLEN</span> <span class="op">WORD</span>  <span class="num">4096</span>
+
+<span class="cm">. WRREC 副程式（從 BUFFER 寫一筆紀錄到輸出裝置）</span>
+<span class="lbl">WRREC</span>  <span class="op">LDX</span>   ZERO
+<span class="lbl">WLOOP</span>  <span class="op">TD</span>    OUTPUT
+       <span class="op">JEQ</span>   WLOOP
+       <span class="op">LDCH</span>  BUFFER,X
+       <span class="op">WD</span>    OUTPUT
+       <span class="op">TIX</span>   LENGTH
+       <span class="op">JLT</span>   WLOOP
+       <span class="op">RSUB</span>
+<span class="lbl">OUTPUT</span> <span class="op">BYTE</span>  X'05'
+       <span class="op">END</span>   FIRST</code></pre>
+
+  <div class="box box-tip">
+    <strong>💡 TIX 指令說明</strong>
+    <code>TIX m</code> 做兩件事：① X ← (X) + 1，② 比較新的 X 和 (m)，設定 CC<br>
+    所以 <code>TIX MAXLEN</code> + <code>JLT RLOOP</code> = 迴圈計數器（相當於 C 的 <code>if (++i &lt; maxlen) goto loop</code>）
+  </div>
+</div>
+
+<!-- 常見程式模式 -->
+<div class="section">
+  <h2>🔁 4. 常見程式模式</h2>
+  <h3>陣列索引迴圈（每次 +3，因為 1 word = 3 bytes）</h3>
+  <pre><code><span class="cm">. C 語言：for(i=0; i&lt;100; i++) gamma[i] = alpha[i] + beta[i];</span>
+       <span class="op">LDX</span>   ZERO        <span class="cm">. X = 0</span>
+<span class="lbl">LOOP</span>   <span class="op">LDA</span>   ALPHA,X     <span class="cm">. A = alpha[i]（索引定址）</span>
+       <span class="op">ADD</span>   BETA,X      <span class="cm">. A = A + beta[i]</span>
+       <span class="op">STA</span>   GAMMA,X     <span class="cm">. gamma[i] = A</span>
+       <span class="op">TIX</span>   K300        <span class="cm">. X += 3，比較 X 和 300（100×3）</span>
+       <span class="op">JLT</span>   LOOP
+K300   <span class="op">WORD</span>  <span class="num">300</span></code></pre>
+
+  <div class="quiz">
+    <div class="quiz-label">🧠 小測驗</div>
+    <div class="quiz-q">為什麼陣列迴圈每次要把 X 加 <strong>3</strong> 而不是 <strong>1</strong>？</div>
+    <details><summary>查看答案</summary>
+      <div class="answer">因為 SIC 的一個 word 是 3 bytes，陣列元素是 WORD 型態，所以相鄰元素之間相差 3 個 byte 的位址。索引 X 要加 3 才能跳到下一個元素。</div>
+    </details>
+  </div>
+</div>
+
+<!-- ── 課堂練習 ───────────────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">2026 / 03 / 12 &amp; 03 / 19</span></h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1rem;">
+    把高階語言翻成 SIC 組合語言，是本課最核心的能力。
+  </p>
+
+  <div class="practice">
+    <div class="p-num">03/12 Q3 · 40%</div>
+    <div class="p-q">將以下 C 程式翻譯成 SIC 組合語言（含資料宣告）：</div>
+<pre style="margin:.5rem 0 .75rem;">int BETA = 3;
+int GAMMA = 8;
+int ALPHA;
+ALPHA = BETA * GAMMA + 8;</pre>
+    <div class="p-hint">SIC 有 MUL 指令（把 A 乘以 operand，結果存回 A）。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+<pre>BETA   WORD  3
+GAMMA  WORD  8
+ALPHA  RESW  1
+EIGHT  WORD  8
+       LDA   BETA     ; A = 3
+       MUL   GAMMA    ; A = 3 × 8 = 24
+       ADD   EIGHT    ; A = 24 + 8 = 32
+       STA   ALPHA    ; ALPHA = 32</pre>
+        為什麼需要宣告 EIGHT？因為 SIC 沒有立即定址，常數 8 必須先放在記憶體才能用 ADD 讀取。
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">字元陣列迴圈 · 30%</div>
+    <div class="p-q">將以下 C 迴圈翻譯成 SIC 組合語言（空白字元 ASCII = 32）：</div>
+<pre style="margin:.5rem 0 .75rem;">char str[10];
+for (i = 0; i &lt; 10; i++)
+    str[i] = ' ';</pre>
+    <div class="p-hint">char 是 1 byte，用 STCH（store byte）寫入；用 X 暫存器作索引，每次加 1；用 TIX 自動把 X 加 1 並比較。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+<pre>       LDX   ZERO     ; X = 0（起始索引）
+MOV    LDCH  SPACE    ; A 低 8 bits = ' '
+       STCH  STR,X    ; str[X] = ' '
+       TIX   TEN      ; X = X+1；若 X &lt; 10 設 CC=&lt;
+       JLT   MOV      ; 繼續迴圈
+
+STR    RESB  10       ; 10 bytes 的字元陣列
+SPACE  BYTE  C' '    ; 空白字元（引號內有一個空格，ASCII = 32）
+ZERO   WORD  0
+TEN    WORD  10</pre>
+        <em>TIX TEN 做兩件事：① 把 X 加 1，② 比較 X 和 TEN（=10），若 X &lt; 10 就設 condition code 為「less than」。接著 JLT 判斷這個 condition code 決定是否繼續。</em>
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">整數陣列迴圈 · 30%</div>
+    <div class="p-q">將以下 C 迴圈翻譯成 SIC 組合語言：</div>
+<pre style="margin:.5rem 0 .75rem;">int arr[10];
+for (i = 0; i &lt; 10; i++)
+    arr[i] = 0;</pre>
+    <div class="p-hint">int 是 WORD = 3 bytes，索引每次要加 3。TIX 只能加 1，所以改用手動更新索引。終止條件：INDEX ≥ 30（= 10 × 3）。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+<pre>       LDA   ZERO
+       STA   INDEX    ; INDEX = 0
+MOV    LDX   INDEX    ; X = 目前索引（byte 偏移量）
+       LDA   ZERO
+       STA   ARR,X    ; 把 0 寫到 ARR + X 的位址（X 是 byte 偏移量，不是 index）
+       LDA   INDEX
+       ADD   THREE    ; INDEX += 3
+       STA   INDEX
+       COMP  THIRTY   ; 比較 INDEX 與 30
+       JLT   MOV      ; INDEX &lt; 30 繼續
+
+ARR    RESW  10       ; 10 × 3 = 30 bytes
+ZERO   WORD  0
+THREE  WORD  3
+THIRTY WORD  30
+INDEX  RESW  1</pre>
+        <em>和 char 版本的差異：int 每個元素佔 3 bytes，所以終止值是 10×3=30，步長是 3。</em>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson3.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>SIC/XE 架構</div></a>
+  <a href="lesson5.html" class="nav-btn next"><span>→</span><div><span class="nav-label">下一課</span>Two-Pass 組譯器</div></a>
+</div>
+</div>
+</body>
+</html>

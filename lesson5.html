@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第5課：Two-Pass 組譯器 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header"><div class="container"><h1>⚙️ 系統程式 System Programming</h1></div></header>
+<nav class="lesson-nav"><div class="nav-inner">
+  <a href="index.html" class="nav-home">🏠 首頁</a>
+  <a href="lesson1.html">1. 數值系統</a><a href="lesson2.html">2. SIC架構</a>
+  <a href="lesson3.html">3. SIC/XE</a><a href="lesson4.html">4. 組合語言</a>
+  <a href="lesson5.html" class="active">5. Two-Pass</a><a href="lesson6.html">6. One-Pass</a>
+  <a href="lesson7.html">7. 定址模式</a><a href="lesson8.html">8. 程式重定位</a>
+</div></nav>
+<div class="lesson-header"><div class="container">
+  <div class="lesson-num">5</div>
+  <div><h1>Two-Pass 組譯器</h1><div class="lesson-sub">OPTAB ｜ SYMTAB ｜ LOCCTR ｜ Object Program 格式</div></div>
+</div></div>
+
+<div class="container">
+
+<div class="section">
+  <h2>🔧 1. 組譯器是什麼？</h2>
+  <p>組譯器（Assembler）把組合語言原始碼翻譯成機器可執行的目的碼（Object Program）。它需要做這些事：</p>
+  <ul>
+    <li>把 mnemonic 轉換成對應的機器碼（如 <code>LDA → 0x00</code>）</li>
+    <li>把符號位址（Label）轉換成實際記憶體位址</li>
+    <li>把資料常數轉換成機器內部表示</li>
+    <li>產生 Object Program（Header + Text + End records）</li>
+  </ul>
+
+  <h3>為什麼需要兩個 Pass？</h3>
+  <div class="box box-warning">
+    <strong>⚠️ Forward Reference 問題</strong>
+    在第一行程式碼就可能跳到後面定義的 Label（如 <code>JEQ ENDFIL</code>），而 ENDFIL 到程式後面才定義。
+    一次掃描沒辦法知道它的位址，所以需要<strong>兩個 Pass</strong>。
+  </div>
+</div>
+
+<!-- 兩個 Pass 的分工 -->
+<div class="section">
+  <h2>🔄 2. Two-Pass 組譯器架構</h2>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 200" width="680" height="200" font-family="sans-serif" font-size="13">
+      <!-- Source -->
+      <rect x="10" y="70" width="110" height="60" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+      <text x="65" y="96" text-anchor="middle" fill="#1e293b" font-weight="bold">Source</text>
+      <text x="65" y="114" text-anchor="middle" fill="#1e293b">Program</text>
+      <!-- Pass 1 box -->
+      <path d="M122,100 L158,100" stroke="#64748b" stroke-width="1.5" marker-end="url(#pa)"/>
+      <defs><marker id="pa" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <rect x="160" y="55" width="130" height="90" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="225" y="83" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="14">Pass 1</text>
+      <text x="225" y="101" text-anchor="middle" fill="#64748b" font-size="11">定義符號</text>
+      <text x="225" y="117" text-anchor="middle" fill="#64748b" font-size="11">建立 SYMTAB</text>
+      <text x="225" y="133" text-anchor="middle" fill="#64748b" font-size="11">計算位址（LOCCTR）</text>
+      <!-- Intermediate file -->
+      <path d="M292,100 L328,100" stroke="#64748b" stroke-width="1.5" marker-end="url(#pa)"/>
+      <rect x="330" y="70" width="110" height="60" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <text x="385" y="96" text-anchor="middle" fill="#64748b" font-weight="bold">Intermediate</text>
+      <text x="385" y="114" text-anchor="middle" fill="#64748b">File</text>
+      <!-- Pass 2 box -->
+      <path d="M442,100 L478,100" stroke="#64748b" stroke-width="1.5" marker-end="url(#pa)"/>
+      <rect x="480" y="55" width="130" height="90" rx="10" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <text x="545" y="83" text-anchor="middle" fill="#065f46" font-weight="bold" font-size="14">Pass 2</text>
+      <text x="545" y="101" text-anchor="middle" fill="#64748b" font-size="11">產生機器碼</text>
+      <text x="545" y="117" text-anchor="middle" fill="#64748b" font-size="11">查 OPTAB/SYMTAB</text>
+      <text x="545" y="133" text-anchor="middle" fill="#64748b" font-size="11">產生 Object Program</text>
+      <!-- Object program -->
+      <path d="M612,100 L648,100" stroke="#64748b" stroke-width="1.5" marker-end="url(#pa)"/>
+      <rect x="650" y="70" width="20" height="60" rx="4" fill="#1e40af"/>
+      <text x="660" y="105" text-anchor="middle" fill="white" font-size="9" writing-mode="tb">OBJ</text>
+      <!-- OPTAB -->
+      <rect x="160" y="155" width="130" height="32" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="1.5"/>
+      <text x="225" y="176" text-anchor="middle" fill="#92400e" font-weight="bold">OPTAB（共用）</text>
+      <path d="M225,155 L225,147" stroke="#d97706" stroke-width="1.5" stroke-dasharray="3,2"/>
+      <!-- SYMTAB -->
+      <rect x="480" y="155" width="130" height="32" rx="6" fill="#fde8ff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="545" y="176" text-anchor="middle" fill="#6d28d9" font-weight="bold">SYMTAB（Pass1→Pass2）</text>
+      <path d="M545,155 L545,147" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="3,2"/>
+    </svg>
+    <div class="caption">Pass 1 建立 SYMTAB → 透過中間檔傳給 Pass 2 → 產生 Object Program</div>
+  </div>
+
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Pass 1（第一遍）</th><th>Pass 2（第二遍）</th></tr>
+    <tr><td><strong>主要任務</strong></td><td>定義符號，建立 SYMTAB</td><td>產生機器碼，生成 Object Program</td></tr>
+    <tr><td><strong>輸入</strong></td><td>原始碼</td><td>中間檔 + SYMTAB</td></tr>
+    <tr><td><strong>輸出</strong></td><td>中間檔 + SYMTAB</td><td>Object Program + Listing</td></tr>
+    <tr><td><strong>關鍵操作</strong></td><td>LOCCTR 累加計算每行位址</td><td>查 OPTAB 和 SYMTAB，組合機器碼</td></tr>
+  </table></div>
+</div>
+
+<!-- 三大資料結構 -->
+<div class="section">
+  <h2>🗂️ 3. 三大資料結構</h2>
+
+  <h3>① OPTAB（Operation Code Table）</h3>
+  <p>儲存每個 mnemonic 對應的 opcode 和格式，使用 <strong>Hash Table</strong>（查詢 O(1)）。</p>
+  <div class="table-wrap"><table>
+    <tr><th>Mnemonic</th><th>Opcode</th><th>Format</th></tr>
+    <tr><td>LDA</td><td>00</td><td>3/4</td></tr>
+    <tr><td>STA</td><td>0C</td><td>3/4</td></tr>
+    <tr><td>ADD</td><td>18</td><td>3/4</td></tr>
+    <tr><td>JSUB</td><td>48</td><td>3/4</td></tr>
+    <tr><td>RSUB</td><td>4C</td><td>3/4</td></tr>
+  </table></div>
+
+  <h3>② SYMTAB（Symbol Table）</h3>
+  <p>Pass 1 掃描到 Label 時，把它的位址存進去；Pass 2 查詢符號位址。也用 Hash Table。</p>
+  <div class="table-wrap"><table>
+    <tr><th>Symbol</th><th>Value（位址 hex）</th><th>Flags</th></tr>
+    <tr><td>COPY</td><td>1000</td><td>—</td></tr>
+    <tr><td>FIRST</td><td>1000</td><td>—</td></tr>
+    <tr><td>CLOOP</td><td>1003</td><td>—</td></tr>
+    <tr><td>ENDFIL</td><td>1015</td><td>—</td></tr>
+    <tr><td>EOF</td><td>1024</td><td>—</td></tr>
+    <tr><td>BUFFER</td><td>1036</td><td>—</td></tr>
+  </table></div>
+
+  <h3>③ LOCCTR（Location Counter）</h3>
+  <p>追蹤目前組譯到哪個位址，每處理一條指令就加上該指令的長度：</p>
+  <ul>
+    <li>一般指令：+3（3 bytes）</li>
+    <li>WORD：+3</li>
+    <li>RESW n：+3n</li>
+    <li>RESB n：+n</li>
+    <li>BYTE C'xxx'：+字串長度</li>
+    <li>BYTE X'xx'：+1</li>
+  </ul>
+</div>
+
+<!-- Object Program 格式 -->
+<div class="section">
+  <h2>📄 4. Object Program 格式</h2>
+  <p>Object Program 由三種 Record 組成：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 260" width="680" height="260" font-family="monospace" font-size="12">
+      <text x="340" y="20" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af" font-family="sans-serif">Object Program 結構</text>
+
+      <!-- H record -->
+      <rect x="20" y="35" width="640" height="55" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <rect x="20" y="35" width="35"  height="55" rx="4" fill="#2563eb"/>
+      <text x="37" y="66" text-anchor="middle" fill="white" font-weight="bold" font-size="16">H</text>
+      <text x="75"  y="52" fill="#1e293b" font-weight="bold">Header Record（一個）</text>
+      <text x="75"  y="72" fill="#64748b" font-size="10">Col.1=H  |  Col.2-7=程式名稱  |  Col.8-13=起始位址(hex)  |  Col.14-19=程式長度(hex)</text>
+      <text x="75"  y="85" fill="#1e40af" font-size="11">例：HCOPY  001000001073</text>
+
+      <!-- T record -->
+      <rect x="20" y="105" width="640" height="80" rx="8" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <rect x="20" y="105" width="35"  height="80" rx="4" fill="#059669"/>
+      <text x="37" y="150" text-anchor="middle" fill="white" font-weight="bold" font-size="16">T</text>
+      <text x="75" y="122" fill="#1e293b" font-weight="bold">Text Record（可以有多個）</text>
+      <text x="75" y="142" fill="#64748b" font-size="10">Col.1=T  |  Col.2-7=起始位址(hex)  |  Col.8-9=此紀錄長度(hex)  |  Col.10-69=目的碼</text>
+      <text x="75" y="162" fill="#64748b">每個 Text Record 最多 30 bytes 目的碼（60 hex 字元）</text>
+      <text x="75" y="178" fill="#059669" font-size="11">例：T0010001E141033482061...</text>
+
+      <!-- E record -->
+      <rect x="20" y="200" width="640" height="50" rx="8" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <rect x="20" y="200" width="35"  height="50" rx="4" fill="#d97706"/>
+      <text x="37" y="229" text-anchor="middle" fill="white" font-weight="bold" font-size="16">E</text>
+      <text x="75" y="217" fill="#1e293b" font-weight="bold">End Record（一個）</text>
+      <text x="75" y="237" fill="#64748b">Col.1=E  |  Col.2-7=第一條執行指令的位址（END 指令的 operand）</text>
+      <text x="75" y="250" fill="#d97706" font-size="11">例：E001000</text>
+    </svg>
+    <div class="caption">H（Header）→ 多個 T（Text）→ E（End）</div>
+  </div>
+
+  <h3>完整範例（COPY 程式的 Object Program）</h3>
+  <pre><code>HCOPY  001000 01073       <span class="cm">← Header: 程式名 COPY, 起始 0x1000, 長度 0x1073</span>
+T001000 1E 141033482061...  <span class="cm">← Text: 從 0x1000 開始, 30 bytes 目的碼</span>
+T00101E 15 0C103A...        <span class="cm">← Text: 從 0x101E 開始, 21 bytes</span>
+...
+E001000                     <span class="cm">← End: 從 0x1000 開始執行（FIRST 的位址）</span></code></pre>
+
+  <div class="quiz">
+    <div class="quiz-label">🧠 小測驗</div>
+    <div class="quiz-q">Pass 1 結束後，SYMTAB 裡有什麼？Pass 2 靠什麼查出每個 Label 的位址？</div>
+    <details><summary>查看答案</summary>
+      <div class="answer">
+        Pass 1 結束後，SYMTAB 裡有所有 Label 對應的十六進位位址。<br>
+        Pass 2 靠查 SYMTAB（Hash Table，O(1)）取得每個 Label 的位址，填入指令的 address 欄位。
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- Pass 1 演算法 -->
+<div class="section">
+  <h2>⚙️ 5. Pass 1 演算法（重點）</h2>
+  <pre><code><span class="kw">Pass 1:</span>
+  讀取第一行
+  <span class="kw">if</span> OPCODE == 'START':
+      LOCCTR = 起始位址（operand）
+      把 START 行寫入中間檔
+      讀下一行
+  <span class="kw">else</span>:
+      LOCCTR = 0
+
+  <span class="kw">while</span> OPCODE != 'END':
+      <span class="kw">if</span> 不是註解:
+          <span class="kw">if</span> 有 LABEL:
+              <span class="kw">if</span> LABEL 已在 SYMTAB → 錯誤（重複定義）
+              <span class="kw">else</span> → 把 (LABEL, LOCCTR) 加入 SYMTAB
+          查 OPTAB 找指令長度
+          <span class="kw">if</span> OPCODE 在 OPTAB → LOCCTR += 3（一般指令）
+          <span class="kw">elif</span> OPCODE == 'WORD' → LOCCTR += 3
+          <span class="kw">elif</span> OPCODE == 'RESW' → LOCCTR += 3 * operand
+          <span class="kw">elif</span> OPCODE == 'RESB' → LOCCTR += operand
+          <span class="kw">elif</span> OPCODE == 'BYTE' → LOCCTR += 常數長度
+          <span class="kw">else</span> → 錯誤（無效 opcode）
+      把這行（含目前 LOCCTR）寫入中間檔
+      讀下一行
+
+  把最後一行（END）寫入中間檔
+  儲存程式長度 = LOCCTR - 起始位址</code></pre>
+</div>
+
+<!-- ── 課堂練習 ───────────────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">2026 / 04 / 09 &amp; 04 / 16</span></h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:.75rem;">
+    給定原始碼，填寫 Loc 欄位與 Object Code，並產生完整的 Object Program（H/T/E records）。
+  </p>
+  <div class="box box-info" style="margin-bottom:1rem;font-size:.9rem;">
+    <strong>📌 T record 格式速查</strong>
+    <code>T ^ 起始位址(6 hex) ^ 長度(2 hex，十六進位) ^ object code 連在一起</code><br>
+    例：<code>T^002000^15^...</code> → 從位址 2000 開始，長度 15₁₆（= 21 bytes）的 object code
+  </div>
+
+  <div class="practice">
+    <div class="p-num">04/09 · SUM 程式 · 填 Loc &amp; Object Code</div>
+    <div class="p-q">以下 SIC 程式起始位址 2000₁₆，請填寫每行的 Loc 和 Object Code，再寫出 Object Program。</div>
+    <div class="table-wrap" style="margin:.5rem 0 .75rem;">
+      <table>
+        <tr><th>Loc</th><th>Label</th><th>Mnemonic</th><th>Operand</th><th>Object Code</th></tr>
+        <tr><td>—</td><td>SUM</td><td>START</td><td>2000</td><td>—</td></tr>
+        <tr><td></td><td>FIRST</td><td>LDX</td><td>ZERO</td><td></td></tr>
+        <tr><td></td><td></td><td>LDA</td><td>ZERO</td><td></td></tr>
+        <tr><td></td><td>LOOP</td><td>ADD</td><td>TABLE,X</td><td></td></tr>
+        <tr><td></td><td></td><td>TIX</td><td>COUNT</td><td></td></tr>
+        <tr><td></td><td></td><td>JLT</td><td>LOOP</td><td></td></tr>
+        <tr><td></td><td></td><td>STA</td><td>TOTAL</td><td></td></tr>
+        <tr><td></td><td></td><td>RSUB</td><td></td><td></td></tr>
+        <tr><td></td><td>COUNT</td><td>RESW</td><td>1</td><td>—</td></tr>
+        <tr><td></td><td>ZERO</td><td>WORD</td><td>0</td><td></td></tr>
+        <tr><td></td><td>TABLE</td><td>RESW</td><td>1000</td><td>—</td></tr>
+        <tr><td></td><td>TOTAL</td><td>RESW</td><td>1</td><td>—</td></tr>
+        <tr><td></td><td>ONE</td><td>WORD</td><td>1</td><td></td></tr>
+        <tr><td></td><td></td><td>END</td><td>FIRST</td><td>—</td></tr>
+      </table>
+    </div>
+    <div class="p-hint">RESW n → 佔 n×3 bytes，無 object code。WORD n → 3 bytes，值寫成 6 位 hex。TABLE 有 1000 個 word = 3000 = BB8₁₆ bytes。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        <div class="table-wrap">
+          <table>
+            <tr><th>Loc</th><th>Label</th><th>Mnemonic</th><th>Operand</th><th>Object Code</th></tr>
+            <tr><td>—</td><td>SUM</td><td>START</td><td>2000</td><td>—</td></tr>
+            <tr><td>2000</td><td>FIRST</td><td>LDX</td><td>ZERO</td><td>04 2018</td></tr>
+            <tr><td>2003</td><td></td><td>LDA</td><td>ZERO</td><td>00 2018</td></tr>
+            <tr><td>2006</td><td>LOOP</td><td>ADD</td><td>TABLE,X</td><td>18 A01B <em>(x=1)</em></td></tr>
+            <tr><td>2009</td><td></td><td>TIX</td><td>COUNT</td><td>2C 2015</td></tr>
+            <tr><td>200C</td><td></td><td>JLT</td><td>LOOP</td><td>38 2006</td></tr>
+            <tr><td>200F</td><td></td><td>STA</td><td>TOTAL</td><td>0C 2BD3</td></tr>
+            <tr><td>2012</td><td></td><td>RSUB</td><td></td><td>4C 0000</td></tr>
+            <tr><td>2015</td><td>COUNT</td><td>RESW</td><td>1</td><td>—</td></tr>
+            <tr><td>2018</td><td>ZERO</td><td>WORD</td><td>0</td><td>000000</td></tr>
+            <tr><td>201B</td><td>TABLE</td><td>RESW</td><td>1000</td><td>— <em>(1000×3=BB8₁₆ bytes)</em></td></tr>
+            <tr><td>2BD3</td><td>TOTAL</td><td>RESW</td><td>1</td><td>—</td></tr>
+            <tr><td>2BD6</td><td>ONE</td><td>WORD</td><td>1</td><td>000001</td></tr>
+            <tr><td>2BD9</td><td></td><td>END</td><td>FIRST</td><td>—</td></tr>
+          </table>
+        </div>
+        <strong>Object Code 補充說明：</strong><br>
+        ADD TABLE,X 的 object code 為什麼是 <code>18 A0 1B</code>？<br>
+        SIC 指令 3 bytes：byte0 = opcode（18），bytes 1-2 = [x-bit][15-bit 位址]<br>
+        TABLE 位址 = 201B，x = 1，所以 bytes 1-2 的最高位強制設成 1：<br>
+        &nbsp;&nbsp;位址 201B → 高 7 bits = 20₁₆ 的低 7 位 = 0100000 → 加上最高位 1 → <strong>10100000 = A0₁₆</strong><br>
+        &nbsp;&nbsp;低 8 bits 直接填 1B₁₆<br>
+        → 最終：18 A0 1B ✓<br><br>
+        <strong>Object Program：</strong>
+<pre>H^SUM   ^002000^000BD9
+T^002000^15^042018^002018^18A01B^2C2015^382006^0C2BD3^4C0000
+T^002018^03^000000
+T^002BD6^03^000001
+E^002000</pre>
+        說明：<br>
+        • 程式長度 = 2BD9 - 2000 = BD9₁₆（H record 的長度欄填十六進位）<br>
+        • T record 第二欄（如 <code>15</code>）是這段資料的 byte 數，也是<strong>十六進位</strong>：15₁₆ = 21₁₀ bytes<br>
+        • 第一個 T record 從 2000 到 2014，含 7 條指令 × 3 bytes = 21 bytes = 15₁₆ ✓<br>
+        • RESW 沒有 object code，所以 T record 遇到 RESW 就必須切斷，下一個 WORD 另開一個 T record
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">04/16 · TEST 程式 · 翻譯成 Object Program</div>
+    <div class="p-q">以下 SIC 程式功能為「累加一個 10-word 表格的總和」，起始位址 3000₁₆，請填寫 Loc、Object Code 並產生 Object Program。</div>
+<pre style="margin:.5rem 0 .75rem;">       TEST   START  3000
+       FIRST  LDA    ZERO
+              STA    INDEX
+              STA    TOTAL
+       LOOP   LDX    INDEX
+              LDA    TOTAL
+              ADD    TABLE,X
+              STA    TOTAL
+              LDA    INDEX
+              ADD    THREE
+              STA    INDEX
+              COMP   THIRTY
+              JLT    LOOP
+              RSUB
+THREE  WORD   3
+TOTAL  RESW   1
+ZERO   WORD   0
+TABLE  RESW   10
+INDEX  RESW   1
+THIRTY WORD   30
+TMP    BYTE   C'E'
+       END    FIRST</pre>
+    <div class="p-hint">先用 Pass 1 建出 SYMTAB（含各 label 的位址），再用 Pass 2 填 object code。RESW 10 = 30 bytes = 1E₁₆。BYTE C'E' = 1 byte，hex 為 45₁₆。</div>
+    <details>
+      <summary>查看 SYMTAB &amp; Object Program 解答</summary>
+      <div class="answer">
+        <strong>部分 SYMTAB（Pass 1 結果）：</strong>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Symbol</th><th>Address</th></tr>
+            <tr><td>TEST</td><td>3000</td></tr>
+            <tr><td>FIRST</td><td>3000</td></tr>
+            <tr><td>LOOP</td><td>3009</td></tr>
+            <tr><td>THREE</td><td>3027</td></tr>
+            <tr><td>TOTAL</td><td>302A</td></tr>
+            <tr><td>ZERO</td><td>302D</td></tr>
+            <tr><td>TABLE</td><td>3030</td></tr>
+            <tr><td>INDEX</td><td>304E</td></tr>
+            <tr><td>THIRTY</td><td>3051</td></tr>
+            <tr><td>TMP</td><td>3054</td></tr>
+          </table>
+        </div>
+        <strong>Object Program：</strong>
+<pre>H^TEST  ^003000^000055
+T^003000^...（指令的 object code）
+...
+E^003000</pre>
+        程式長度 = 3055 - 3000 = 55₁₆（TMP BYTE C'E' 之後）
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ── 課堂練習（符號表） ──────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">2-Pass 符號表</span></h2>
+
+  <div class="practice">
+    <div class="p-num">2-Pass vs 1-Pass 比較題 · 35%</div>
+    <div class="p-q">
+      下列 SIC 程式掃描到第 9 行（RSUB）結束後，Two-Pass 組譯器的 Symbol Table 長什麼樣子？
+    </div>
+<pre style="margin:.5rem 0 .75rem;">1  2000  PROG   START  2000
+2  2000  NUM    WORD   1000
+3  2003  FIRST  LDX    ZERO
+4  2006         LDA    ZERO
+5  2009  LOOP   ADD    TABLE,X
+6  200C         TIX    COUNT
+7  200F         JLT    LOOP
+8  2012         STA    TOTAL
+9  2015         RSUB
+10 2018  TABLE  RESW   2000
+...（後面還有）</pre>
+    <div class="p-hint">Pass 1 在逐行掃描時，只要遇到有 Label 的行，就把 (Label, LOCCTR) 存入 SYMTAB。掃到第 9 行時，已遇到哪些 Label？</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        掃到第 9 行（含）的 SYMTAB：
+        <div class="table-wrap">
+          <table>
+            <tr><th>Symbol</th><th>Address（hex）</th><th>說明</th></tr>
+            <tr><td>PROG</td><td>2000</td><td>行 1，START</td></tr>
+            <tr><td>NUM</td><td>2000</td><td>行 2，WORD（3 bytes）</td></tr>
+            <tr><td>FIRST</td><td>2003</td><td>行 3</td></tr>
+            <tr><td>LOOP</td><td>2009</td><td>行 5</td></tr>
+          </table>
+        </div>
+        TABLE、COUNT、ZERO、TOTAL 等在第 10 行之後定義，Pass 1 掃到第 9 行時還<strong>沒有</strong>它們的位址，這就是為什麼 Pass 1 必須完整掃完才能解決 Forward Reference。<br><br>
+        <strong>1-Pass 組譯器的差異：</strong>遇到未知的 operand（如 ZERO、TABLE）時，先暫時填 0 並記入 Forward Reference List，等後面遇到定義再回頭修正（Back-Patching）。
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson4.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>組合語言</div></a>
+  <a href="lesson6.html" class="nav-btn next"><span>→</span><div><span class="nav-label">下一課</span>One-Pass 組譯器</div></a>
+</div>
+</div>
+</body>
+</html>

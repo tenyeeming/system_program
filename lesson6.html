@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第6課：One-Pass & Multi-Pass | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header"><div class="container"><h1>⚙️ 系統程式 System Programming</h1></div></header>
+<nav class="lesson-nav"><div class="nav-inner">
+  <a href="index.html" class="nav-home">🏠 首頁</a>
+  <a href="lesson1.html">1. 數值系統</a><a href="lesson2.html">2. SIC架構</a>
+  <a href="lesson3.html">3. SIC/XE</a><a href="lesson4.html">4. 組合語言</a>
+  <a href="lesson5.html">5. Two-Pass</a><a href="lesson6.html" class="active">6. One-Pass</a>
+  <a href="lesson7.html">7. 定址模式</a><a href="lesson8.html">8. 程式重定位</a>
+</div></nav>
+<div class="lesson-header"><div class="container">
+  <div class="lesson-num">6</div>
+  <div><h1>One-Pass & Multi-Pass 組譯器</h1><div class="lesson-sub">Forward Reference ｜ Load-and-go ｜ EQU</div></div>
+</div></div>
+
+<div class="container">
+
+<div class="section">
+  <h2>⚡ 1. One-Pass 組譯器</h2>
+  <p><strong>目標：只掃一次原始碼就完成組譯</strong>，省去中間檔的 I/O 開銷，速度更快。</p>
+
+  <h3>主要問題：Forward Reference</h3>
+  <div class="box box-warning">
+    <strong>⚠️ Forward Reference（向前參考）</strong>
+    指的是使用一個<strong>在後面才定義</strong>的 Label。<br>
+    例：第 1 行 <code>JEQ ENDFIL</code>，但 ENDFIL 在第 30 行才定義。<br>
+    One-pass 到第 1 行時還不知道 ENDFIL 的位址！
+  </div>
+
+  <h3>兩種 One-Pass 組譯器</h3>
+  <div class="table-wrap"><table>
+    <tr><th>類型</th><th>輸出</th><th>特點</th></tr>
+    <tr><td><strong>Load-and-go</strong></td><td>直接輸出到記憶體執行</td><td>不寫 Object Program，適合開發測試，組譯後立刻執行</td></tr>
+    <tr><td><strong>一般 One-pass</strong></td><td>輸出 Object Program</td><td>需要特殊處理 Forward Reference（duplicate T records）</td></tr>
+  </table></div>
+</div>
+
+<div class="section">
+  <h2>🔍 2. 處理 Forward Reference 的方法</h2>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 200" width="680" height="200" font-family="sans-serif" font-size="13">
+      <text x="340" y="20" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af">One-Pass 處理 Forward Reference</text>
+      <!-- Step 1 -->
+      <rect x="20" y="40" width="190" height="130" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+      <text x="115" y="60" text-anchor="middle" fill="#dc2626" font-weight="bold">遇到未定義符號</text>
+      <text x="115" y="82" text-anchor="middle" fill="#64748b" font-size="11">SYMTAB 找不到</text>
+      <text x="115" y="100" text-anchor="middle" fill="#1e293b" font-size="12">→ 把符號加入 SYMTAB</text>
+      <text x="115" y="118" text-anchor="middle" fill="#1e293b" font-size="12">→ 標記為「未定義」(*)</text>
+      <text x="115" y="136" text-anchor="middle" fill="#1e293b" font-size="12">→ 把這條指令的位址</text>
+      <text x="115" y="152" text-anchor="middle" fill="#1e293b" font-size="12">   加入 Forward Ref List</text>
+      <text x="115" y="168" text-anchor="middle" fill="#1e293b" font-size="12">   (operand 暫填 0)</text>
+      <!-- Arrow -->
+      <path d="M215,105 L255,105" stroke="#64748b" stroke-width="1.5" marker-end="url(#oa)"/>
+      <defs><marker id="oa" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <!-- Step 2 -->
+      <rect x="260" y="40" width="190" height="130" rx="10" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="355" y="60" text-anchor="middle" fill="#d97706" font-weight="bold">遇到符號的定義</text>
+      <text x="355" y="82" text-anchor="middle" fill="#64748b" font-size="11">（就是這個 Label）</text>
+      <text x="355" y="100" text-anchor="middle" fill="#1e293b" font-size="12">→ 把真實位址存入 SYMTAB</text>
+      <text x="355" y="118" text-anchor="middle" fill="#1e293b" font-size="12">→ 掃 Forward Ref List</text>
+      <text x="355" y="136" text-anchor="middle" fill="#1e293b" font-size="12">→ 把所有引用這個符號的</text>
+      <text x="355" y="152" text-anchor="middle" fill="#1e293b" font-size="12">   指令填入正確位址</text>
+      <!-- Arrow -->
+      <path d="M455,105 L495,105" stroke="#64748b" stroke-width="1.5" marker-end="url(#oa)"/>
+      <!-- Step 3 -->
+      <rect x="500" y="40" width="160" height="130" rx="10" fill="#f0fdf4" stroke="#059669" stroke-width="2"/>
+      <text x="580" y="60" text-anchor="middle" fill="#065f46" font-weight="bold">程式結束</text>
+      <text x="580" y="82" text-anchor="middle" fill="#1e293b" font-size="12">→ 若 SYMTAB 仍有</text>
+      <text x="580" y="100" text-anchor="middle" fill="#1e293b" font-size="12">   未定義符號（*）</text>
+      <text x="580" y="118" text-anchor="middle" fill="#dc2626" font-size="12">→ 錯誤：未定義符號</text>
+      <text x="580" y="140" text-anchor="middle" fill="#1e293b" font-size="12">→ 否則從 END 指定</text>
+      <text x="580" y="158" text-anchor="middle" fill="#1e293b" font-size="12">   的位址開始執行</text>
+    </svg>
+    <div class="caption">One-pass 用 Forward Reference List 回頭填入未定義符號的真實位址</div>
+  </div>
+
+  <div class="box box-info">
+    <strong>📌 Load-and-go 的 Forward Reference 處理</strong>
+    對於指向指令的 forward reference（如 JEQ ENDFIL），load-and-go 無法消除——因為無法跳到還沒讀到的位址。
+    但對<strong>資料</strong>的 forward reference 可以用上述方法處理。
+  </div>
+</div>
+
+<div class="section">
+  <h2>🔢 3. Multi-Pass 組譯器</h2>
+  <h3>動機：EQU 指令的問題</h3>
+  <p><code>EQU</code> 讓你用算式定義符號值：</p>
+  <pre><code><span class="lbl">HALFSZ</span>  <span class="op">EQU</span>  MAXLEN/2       <span class="cm">. HALFSZ 的值 = MAXLEN ÷ 2</span>
+<span class="lbl">MAXLEN</span>  <span class="op">EQU</span>  BUFEND-BUFFER  <span class="cm">. MAXLEN 的值 = BUFEND - BUFFER</span>
+<span class="lbl">PREVBT</span>  <span class="op">EQU</span>  BUFFER-1       <span class="cm">. PREVBT = BUFFER 的前一個位址</span>
+...
+<span class="lbl">BUFFER</span>  <span class="op">RESB</span> <span class="num">4096</span>
+<span class="lbl">BUFEND</span>  <span class="op">EQU</span>  *              <span class="cm">. * = 目前位址</span></code></pre>
+
+  <div class="box box-warning">
+    <strong>⚠️ Two-Pass 的問題</strong>
+    <code>HALFSZ EQU MAXLEN/2</code> 在 Pass 1 掃到這行時，MAXLEN 還沒定義（forward reference in directive）！
+    Two-pass 無法處理「右邊包含未定義符號的 EQU」。
+  </div>
+
+  <h3>Multi-Pass 解法</h3>
+  <p>SYMTAB 中每個符號記錄哪些其他符號的值依賴於它（dependency list）。掃多遍，每遍解決能解決的符號，直到全部都定義完。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 160" width="680" height="160" font-family="sans-serif" font-size="13">
+      <text x="340" y="18" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">Multi-Pass EQU 解析範例</text>
+      <!-- Pass 1 -->
+      <rect x="10" y="30" width="155" height="120" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="87" y="50" text-anchor="middle" fill="#dc2626" font-weight="bold">Pass 1</text>
+      <text x="87" y="68" text-anchor="middle" fill="#64748b" font-size="11">HALFSZ = ? (依賴 MAXLEN)</text>
+      <text x="87" y="86" text-anchor="middle" fill="#64748b" font-size="11">MAXLEN = ? (依賴 BUFEND/BUFFER)</text>
+      <text x="87" y="104" text-anchor="middle" fill="#64748b" font-size="11">BUFFER = 1034（RESB 4096）</text>
+      <text x="87" y="122" text-anchor="middle" fill="#065f46" font-size="11">BUFEND = 2034（EQU *）✓</text>
+      <!-- Arrow -->
+      <path d="M167,90 L187,90" stroke="#64748b" stroke-width="1.5" marker-end="url(#oa)"/>
+      <!-- Pass 2 -->
+      <rect x="190" y="30" width="155" height="120" rx="8" fill="#fff7ed" stroke="#d97706" stroke-width="1.5"/>
+      <text x="267" y="50" text-anchor="middle" fill="#d97706" font-weight="bold">Pass 2</text>
+      <text x="267" y="68" text-anchor="middle" fill="#64748b" font-size="11">HALFSZ = ? (依賴 MAXLEN)</text>
+      <text x="267" y="86" text-anchor="middle" fill="#065f46" font-size="11">MAXLEN = 2034-1034 = 1000 ✓</text>
+      <text x="267" y="104" text-anchor="middle" fill="#065f46" font-size="11">BUFFER = 1034 ✓</text>
+      <text x="267" y="122" text-anchor="middle" fill="#065f46" font-size="11">BUFEND = 2034 ✓</text>
+      <!-- Arrow -->
+      <path d="M347,90 L367,90" stroke="#64748b" stroke-width="1.5" marker-end="url(#oa)"/>
+      <!-- Pass 3 -->
+      <rect x="370" y="30" width="155" height="120" rx="8" fill="#f0fdf4" stroke="#059669" stroke-width="1.5"/>
+      <text x="447" y="50" text-anchor="middle" fill="#065f46" font-weight="bold">Pass 3</text>
+      <text x="447" y="68" text-anchor="middle" fill="#065f46" font-size="11">HALFSZ = 1000/2 = 500 ✓</text>
+      <text x="447" y="86" text-anchor="middle" fill="#065f46" font-size="11">MAXLEN = 1000 ✓</text>
+      <text x="447" y="104" text-anchor="middle" fill="#065f46" font-size="11">BUFFER = 1034 ✓</text>
+      <text x="447" y="122" text-anchor="middle" fill="#065f46" font-size="11">BUFEND = 2034 ✓</text>
+      <!-- Arrow -->
+      <path d="M527,90 L547,90" stroke="#64748b" stroke-width="1.5" marker-end="url(#oa)"/>
+      <!-- Final -->
+      <rect x="550" y="50" width="120" height="60" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="610" y="76" text-anchor="middle" fill="#1e40af" font-weight="bold">全部符號</text>
+      <text x="610" y="96" text-anchor="middle" fill="#1e40af" font-weight="bold">定義完成 ✓</text>
+    </svg>
+    <div class="caption">每個 Pass 解決一層依賴，直到所有符號都有值</div>
+  </div>
+</div>
+
+<!-- ── 課堂練習 ───────────────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">1-Pass vs 2-Pass</span></h2>
+
+  <div class="practice">
+    <div class="p-num">1-Pass Object Program · 55%</div>
+    <div class="p-q">
+      對下列程式使用 <strong>1-Pass 組譯器</strong>，寫出完整的 Object Program（含 Forward Reference 的處理方式）：
+    </div>
+<div class="table-wrap" style="font-size:.85rem;margin:.4rem 0 .75rem;">
+      <table>
+        <tr><th>Loc</th><th>Label</th><th>Mnemonic</th><th>Operand</th><th>說明</th></tr>
+        <tr><td>2000</td><td>PROG</td><td>START</td><td>2000</td><td></td></tr>
+        <tr><td>2000</td><td>NUM</td><td>WORD</td><td>1000</td><td>1000₁₀ = 3E8₁₆</td></tr>
+        <tr><td>2003</td><td>FIRST</td><td>LDX</td><td>ZERO</td><td>← Forward Ref</td></tr>
+        <tr><td>2006</td><td></td><td>LDA</td><td>ZERO</td><td>← Forward Ref</td></tr>
+        <tr><td>2009</td><td>LOOP</td><td>ADD</td><td>TABLE,X</td><td>← Forward Ref</td></tr>
+        <tr><td>200C</td><td></td><td>TIX</td><td>COUNT</td><td>← Forward Ref</td></tr>
+        <tr><td>200F</td><td></td><td>JLT</td><td>LOOP</td><td>已知 = 2009</td></tr>
+        <tr><td>2012</td><td></td><td>STA</td><td>TOTAL</td><td>← Forward Ref</td></tr>
+        <tr><td>2015</td><td></td><td>RSUB</td><td></td><td></td></tr>
+        <tr><td>2018</td><td>TABLE</td><td>RESW</td><td>2000</td><td>2000×3=6000=1770₁₆ bytes</td></tr>
+        <tr><td>3788</td><td>ONE</td><td>WORD</td><td>1</td><td></td></tr>
+        <tr><td>378B</td><td>COUNT</td><td>WORD</td><td>200</td><td>200₁₀ = C8₁₆</td></tr>
+        <tr><td>378E</td><td>TOTAL</td><td>RESW</td><td>1</td><td></td></tr>
+        <tr><td>3791</td><td>ZERO</td><td>WORD</td><td>0</td><td></td></tr>
+        <tr><td>3794</td><td></td><td>END</td><td>FIRST</td><td></td></tr>
+      </table>
+    </div>
+    <div class="p-hint">TABLE RESW 2000 = 2000 × 3 = 6000 = 0x1770 bytes，所以 TABLE 結束於 2018+1770 = 3788₁₆。1-Pass 遇到 Forward Reference 時先暫填 000000，稍後 Back-Patch。</div>
+    <details>
+      <summary>查看解答（T records 關鍵部分）</summary>
+      <div class="answer">
+        <strong>SYMTAB（完整，Pass 1 結果）：</strong>
+        PROG=2000, NUM=2000, FIRST=2003, LOOP=2009, TABLE=2018, ONE=3788, COUNT=378B, TOTAL=378E, ZERO=3791<br>
+        <em>※ PROG 和 NUM 都是 2000 嗎？是的。START 設定起始位址後 LOCCTR = 2000，這行本身不佔空間；接著處理 NUM WORD 1000，NUM 得到當前 LOCCTR = 2000，然後 LOCCTR 才推進 3 → 2003。</em><br><br>
+
+        <strong>Object Program（2-Pass 版本）：</strong>
+<pre>H^PROG  ^002000^001794
+T^002000^18^0003E8^043791^003791^18A018^2C378B^382009^0C378E^4C0000
+T^003788^06^000001^0000C8
+T^003791^03^000000
+E^002003</pre>
+        說明：<br>
+        • 程式長度 = 3794 - 2000 = <strong>1794₁₆</strong>（TABLE RESW 6000 bytes = 1770₁₆ bytes 是關鍵）<br>
+        • NUM WORD 1000 → 1000₁₀ = 3E8₁₆ → <code>0003E8</code><br>
+        • ADD TABLE,X：TABLE=2018，x=1 → byte1 = 0x80 | 0x20 = <code>0xA0</code> → <code>18A018</code><br>
+        • T^003788：ONE(000001) + COUNT(0000C8) 共 6 bytes 連續 ✓<br>
+        • TOTAL 是 RESW → 無 obj code，T record 在此切斷<br><br>
+
+        <strong>1-Pass 的差異（Back-Patching）：</strong><br>
+        掃到 LDX ZERO 時 ZERO 未知 → 輸出 <code>04 000000</code>，記下位址 2004（byte 1-2 of LDX 指令）<br>
+        掃到 ZERO 定義（3791）後 → 回去把 2004 位置改成 3791<br>
+        同理修正 LDA(2007)、ADD TABLE(200A)、TIX COUNT(200D)、STA TOTAL(2013)
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson5.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>Two-Pass 組譯器</div></a>
+  <a href="lesson7.html" class="nav-btn next"><span>→</span><div><span class="nav-label">下一課</span>SIC/XE 定址模式</div></a>
+</div>
+</div>
+</body>
+</html>

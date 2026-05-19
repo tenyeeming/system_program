@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第7課：SIC/XE 定址模式 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header"><div class="container"><h1>⚙️ 系統程式 System Programming</h1></div></header>
+<nav class="lesson-nav"><div class="nav-inner">
+  <a href="index.html" class="nav-home">🏠 首頁</a>
+  <a href="lesson1.html">1. 數值系統</a><a href="lesson2.html">2. SIC架構</a>
+  <a href="lesson3.html">3. SIC/XE</a><a href="lesson4.html">4. 組合語言</a>
+  <a href="lesson5.html">5. Two-Pass</a><a href="lesson6.html">6. One-Pass</a>
+  <a href="lesson7.html" class="active">7. 定址模式</a><a href="lesson8.html">8. 程式重定位</a>
+</div></nav>
+<div class="lesson-header"><div class="container">
+  <div class="lesson-num">7</div>
+  <div><h1>SIC/XE 定址模式</h1><div class="lesson-sub">PC-relative ｜ Base-relative ｜ Immediate ｜ Indirect ｜ nixbpe</div></div>
+</div></div>
+
+<div class="container">
+
+<div class="section">
+  <h2>🗺️ 1. 六種定址模式總覽</h2>
+  <div class="table-wrap"><table>
+    <tr><th>定址模式</th><th>語法</th><th>nixbpe</th><th>TA 計算</th></tr>
+    <tr><td>Simple Direct</td><td><code>LDA m</code></td><td>n=1,i=1</td><td>TA = disp + PC 或 B（Format 3）</td></tr>
+    <tr class="highlight-row"><td><strong>PC-Relative</strong></td><td><code>LDA m</code></td><td>n=1,i=1,p=1</td><td>TA = (PC) + disp（disp 可負）</td></tr>
+    <tr><td><strong>Base-Relative</strong></td><td><code>LDA m</code></td><td>n=1,i=1,b=1</td><td>TA = (B) + disp（disp 0-4095）</td></tr>
+    <tr class="highlight-row"><td><strong>Immediate</strong></td><td><code>LDA #c</code></td><td>n=0,i=1</td><td>operand = disp（直接是值，不查記憶體）</td></tr>
+    <tr><td><strong>Indirect</strong></td><td><code>J @m</code></td><td>n=1,i=0</td><td>TA = mem[disp+PC]（間接）</td></tr>
+    <tr><td><strong>Extended（Format 4）</strong></td><td><code>+LDA m</code></td><td>e=1</td><td>TA = 完整 20-bit 位址</td></tr>
+  </table></div>
+</div>
+
+<!-- PC-Relative -->
+<div class="section">
+  <h2>📍 2. PC-Relative 定址</h2>
+  <p>最常用的 Format 3 定址模式。組譯器計算 disp = 目標位址 − 下一條指令的 PC 值。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 660 180" width="660" height="180" font-family="sans-serif" font-size="13">
+      <text x="330" y="20" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">PC-Relative 定址計算</text>
+      <!-- Instruction -->
+      <rect x="20" y="35" width="280" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="160" y="56" text-anchor="middle" fill="#1e40af" font-weight="bold">指令位址 0x0000</text>
+      <text x="160" y="73" text-anchor="middle" fill="#64748b" font-size="12">STL RETADR  (3 bytes)</text>
+      <!-- PC arrow -->
+      <rect x="20" y="100" width="280" height="30" rx="6" fill="#dcfce7" stroke="#059669" stroke-width="1.5"/>
+      <text x="160" y="120" text-anchor="middle" fill="#065f46">Fetch 後 PC = 0x0003（下一條指令）</text>
+      <!-- Target -->
+      <rect x="370" y="35" width="260" height="50" rx="8" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="500" y="56" text-anchor="middle" fill="#92400e" font-weight="bold">RETADR 位址 0x0030</text>
+      <!-- Equation -->
+      <text x="330" y="155" text-anchor="middle" fill="#1e293b" font-size="14">
+        disp = 0x0030 − 0x0003 = <tspan font-weight="bold" fill="#dc2626">0x002D</tspan>（存入 disp 欄位）
+      </text>
+      <text x="330" y="175" text-anchor="middle" fill="#64748b" font-size="12">
+        執行時：TA = (PC) + disp = 0x0003 + 0x002D = 0x0030 ✓
+      </text>
+    </svg>
+    <div class="caption">disp = 目標位址 − 下一條指令 PC（PC-relative）</div>
+  </div>
+
+  <h3>範例計算（來自課本）</h3>
+  <div class="table-wrap"><table>
+    <tr><th>行</th><th>Loc</th><th>指令</th><th>目標</th><th>PC（Fetch後）</th><th>disp = 目標 - PC</th><th>nixbpe</th></tr>
+    <tr><td>10</td><td>0000</td><td>STL RETADR</td><td>0030</td><td>0003</td><td class="highlight-row">2D</td><td>110010</td></tr>
+    <tr><td>40</td><td>0017</td><td>J CLOOP</td><td>0006</td><td>001A</td><td class="highlight-row">FEC（負數！）</td><td>110010</td></tr>
+  </table></div>
+
+  <div class="box box-warning">
+    <strong>⚠️ PC-Relative 的限制</strong>
+    disp 是 12-bit 有號數，範圍 -2048 ~ +2047。<br>
+    如果目標太遠（超出範圍），就要改用 <strong>Base-Relative</strong> 或 <strong>Format 4（+op）</strong>。
+  </div>
+</div>
+
+<!-- Base-Relative -->
+<div class="section">
+  <h2>🏠 3. Base-Relative 定址</h2>
+  <p>用 <strong>B 暫存器</strong>當基底，disp 為 <strong>0 ~ 4095</strong>（無號數）的偏移量。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 660 152" width="660" height="152" font-family="sans-serif" font-size="13">
+      <text x="330" y="18" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">Base-Relative 定址</text>
+      <!-- B register -->
+      <rect x="20" y="35" width="100" height="50" rx="8" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="70" y="57" text-anchor="middle" fill="#6d28d9" font-weight="bold">B 暫存器</text>
+      <text x="70" y="75" text-anchor="middle" fill="#6d28d9">= 0x0033</text>
+      <!-- Plus -->
+      <text x="140" y="65" font-size="20" fill="#64748b">+</text>
+      <!-- Disp -->
+      <rect x="160" y="35" width="100" height="50" rx="8" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <text x="210" y="57" text-anchor="middle" fill="#065f46" font-weight="bold">disp</text>
+      <text x="210" y="75" text-anchor="middle" fill="#065f46">= 0x0003</text>
+      <!-- Equals -->
+      <text x="280" y="65" font-size="20" fill="#64748b">=</text>
+      <!-- TA -->
+      <rect x="305" y="35" width="130" height="50" rx="8" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="370" y="57" text-anchor="middle" fill="#92400e" font-weight="bold">TA = 0x0036</text>
+      <text x="370" y="75" text-anchor="middle" fill="#64748b">= BUFFER 位址</text>
+      <!-- Directive note -->
+      <text x="20" y="115" fill="#64748b" font-size="12">設定 B：使用 <tspan fill="#1e40af" font-weight="bold">LDB #LENGTH</tspan> 然後 <tspan fill="#1e40af" font-weight="bold">BASE LENGTH</tspan> 告訴組譯器 B 的值</text>
+      <text x="20" y="133" fill="#64748b" font-size="12">取消：使用 <tspan fill="#dc2626" font-weight="bold">NOBASE</tspan> 告訴組譯器 B 不再有效</text>
+    </svg>
+    <div class="caption">TA = (B) + disp，disp 為 12-bit 無號數（0~4095）</div>
+  </div>
+
+  <h3>組譯器選擇順序</h3>
+  <ol class="steps">
+    <li><div class="step-num">1</div><div class="step-body"><div class="step-title">先試 PC-relative</div>計算 disp = 目標 − PC，若在 -2048~2047 之間 → 使用 PC-relative（p=1）</div></li>
+    <li><div class="step-num">2</div><div class="step-body"><div class="step-title">若 PC-relative 超出範圍，試 Base-relative</div>計算 disp = 目標 − (B)，若在 0~4095 之間 → 使用 Base-relative（b=1）</div></li>
+    <li><div class="step-num">3</div><div class="step-body"><div class="step-title">若兩者都超出範圍</div>必須使用 <strong>Format 4（+op m）</strong>，e=1，有完整 20-bit 位址</div></li>
+  </ol>
+</div>
+
+<!-- Immediate & Indirect -->
+<div class="section">
+  <h2>⚡ 4. Immediate 與 Indirect 定址</h2>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 220" width="680" height="220" font-family="sans-serif" font-size="13">
+      <!-- Immediate -->
+      <text x="170" y="20" text-anchor="middle" font-weight="bold" fill="#1e40af" font-size="14">Immediate 立即定址（i=1, n=0）</text>
+      <rect x="10" y="30" width="320" height="80" rx="8" fill="#f0f9ff" stroke="#0284c7" stroke-width="2"/>
+      <text x="170" y="55" text-anchor="middle" fill="#1e293b">語法：<tspan font-family="monospace" fill="#1e40af" font-weight="bold">LDA #3</tspan></text>
+      <text x="170" y="75" text-anchor="middle" fill="#64748b">operand 本身就是值（3），不用查記憶體</text>
+      <text x="170" y="95" text-anchor="middle" fill="#64748b">A ← 3（值直接放入 A，不查記憶體）</text>
+      <rect x="10" y="120" width="320" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="170" y="143" text-anchor="middle" fill="#1e40af">機器碼：0000 0000 0 1 ...</text>
+      <text x="170" y="161" text-anchor="middle" fill="#64748b" font-size="11">n=0, i=1 → 第7-8位為 01</text>
+
+      <!-- Indirect -->
+      <text x="510" y="20" text-anchor="middle" font-weight="bold" fill="#7c3aed" font-size="14">Indirect 間接定址（i=0, n=1）</text>
+      <rect x="350" y="30" width="320" height="80" rx="8" fill="#faf5ff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="510" y="55" text-anchor="middle" fill="#1e293b">語法：<tspan font-family="monospace" fill="#7c3aed" font-weight="bold">J @RETADR</tspan></text>
+      <text x="510" y="75" text-anchor="middle" fill="#64748b">先算出 disp+PC = 位址，再去那個位址取值</text>
+      <text x="510" y="95" text-anchor="middle" fill="#64748b">TA = mem[ (PC) + disp ]（兩層間接）</text>
+      <rect x="350" y="120" width="320" height="50" rx="8" fill="#fde8ff" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="510" y="143" text-anchor="middle" fill="#7c3aed">機器碼：0000 0000 1 0 ...</text>
+      <text x="510" y="161" text-anchor="middle" fill="#64748b" font-size="11">n=1, i=0 → 第7-8位為 10</text>
+
+      <!-- Comparison table title -->
+      <text x="340" y="195" text-anchor="middle" fill="#64748b" font-size="12">兩者 n, i 位元都是 01 或 10，不能同時是 00（SIC格式）或 11（simple）</text>
+    </svg>
+    <div class="caption">Immediate = 值直接在指令裡；Indirect = 先取位址再取值</div>
+  </div>
+
+  <div class="quiz">
+    <div class="quiz-label">🧠 小測驗</div>
+    <div class="quiz-q">
+      計算：指令 <code>160 104E STCH BUFFER,X</code><br>
+      BUFFER 位址 = 0x0036，(B) = 0x0033，PC（Fetch後）= 0x1051<br>
+      請問組譯器會用 PC-relative 還是 Base-relative？disp 是多少？
+    </div>
+    <details><summary>查看答案</summary>
+      <div class="answer">
+        試 PC-relative：disp = 0x0036 − 0x1051 = 負的大數，超出 -2048 範圍 ❌<br>
+        試 Base-relative：disp = 0x0036 − 0x0033 = <strong>3</strong>（在 0~4095 內）✅<br>
+        → 使用 <strong>Base-relative</strong>，b=1，disp = 0x003，nixbpe = <strong>110100</strong>（含 x=1 因為有 ,X）
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson6.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>One-Pass 組譯器</div></a>
+  <a href="lesson8.html" class="nav-btn next"><span>→</span><div><span class="nav-label">下一課</span>程式重定位</div></a>
+</div>
+</div>
+</body>
+</html>

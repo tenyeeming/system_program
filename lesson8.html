@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>第8課：程式重定位 | 系統程式</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header"><div class="container"><h1>⚙️ 系統程式 System Programming</h1></div></header>
+<nav class="lesson-nav"><div class="nav-inner">
+  <a href="index.html" class="nav-home">🏠 首頁</a>
+  <a href="lesson1.html">1. 數值系統</a><a href="lesson2.html">2. SIC架構</a>
+  <a href="lesson3.html">3. SIC/XE</a><a href="lesson4.html">4. 組合語言</a>
+  <a href="lesson5.html">5. Two-Pass</a><a href="lesson6.html">6. One-Pass</a>
+  <a href="lesson7.html">7. 定址模式</a><a href="lesson8.html" class="active">8. 程式重定位</a>
+</div></nav>
+<div class="lesson-header"><div class="container">
+  <div class="lesson-num">8</div>
+  <div><h1>程式重定位</h1><div class="lesson-sub">Absolute vs Relocatable ｜ Modification Record ｜ Multiprogramming</div></div>
+</div></div>
+
+<div class="container">
+
+<div class="section">
+  <h2>🖥️ 1. 為什麼需要重定位？</h2>
+  <p>現代電腦通常同時執行多個程式（Multiprogramming），記憶體被分配給不同程式。問題來了：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 180" width="680" height="180" font-family="sans-serif" font-size="13">
+      <text x="340" y="18" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">記憶體佈局（多程式環境）</text>
+      <!-- Memory block -->
+      <rect x="260" y="30" width="160" height="140" rx="4" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+      <!-- OS -->
+      <rect x="261" y="31" width="158" height="30" rx="2" fill="#1e40af"/>
+      <text x="340" y="51" text-anchor="middle" fill="white" font-weight="bold">作業系統</text>
+      <!-- Job 1 -->
+      <rect x="261" y="62" width="158" height="30" rx="0" fill="#dbeafe" stroke="#93c5fd"/>
+      <text x="340" y="82" text-anchor="middle" fill="#1e40af">Job 1（你的程式）</text>
+      <!-- Job 2 -->
+      <rect x="261" y="93" width="158" height="28" rx="0" fill="#fde8ff" stroke="#c4b5fd"/>
+      <text x="340" y="112" text-anchor="middle" fill="#7c3aed">Job 2</text>
+      <!-- Job 3 -->
+      <rect x="261" y="122" width="158" height="25" rx="0" fill="#dcfce7" stroke="#86efac"/>
+      <text x="340" y="139" text-anchor="middle" fill="#065f46">Job 3</text>
+      <!-- Question marks -->
+      <text x="200" y="85" fill="#dc2626" font-size="20" font-weight="bold">?</text>
+      <text x="150" y="85" fill="#64748b" font-size="12">每次載入的位址</text>
+      <text x="150" y="100" fill="#64748b" font-size="12">都可能不同！</text>
+      <!-- Problem text -->
+      <text x="20" y="150" fill="#64748b" font-size="12">Absolute 程式：組譯時固定位址 → 只能載入到特定位址，無法共享記憶體</text>
+      <text x="20" y="168" fill="#1e40af" font-size="12" font-weight="bold">Relocatable 程式：載入時才決定位址 → 可以放在記憶體任何地方 ✓</text>
+    </svg>
+    <div class="caption">多程式環境下，程式需要能載入到任意位址（Relocatable）</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>⚖️ 2. Absolute vs Relocatable 程式</h2>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Absolute Program</th><th>Relocatable Program</th></tr>
+    <tr><td><strong>組譯時</strong></td><td>所有位址固定（如 START 1000）</td><td>START 0，相對位址</td></tr>
+    <tr><td><strong>載入時</strong></td><td>必須載入到指定位址</td><td>可載入到任意位址</td></tr>
+    <tr><td><strong>問題</strong></td><td>無法共享，浪費記憶體</td><td>需要 Modification Record 告訴 Loader 哪些要改</td></tr>
+    <tr class="highlight-row"><td><strong>Object Program</strong></td><td>H, T, E records</td><td>H, T, <strong>M</strong>, E records</td></tr>
+  </table></div>
+
+  <div class="box box-info">
+    <strong>📌 哪些指令不需要修改？</strong>
+    <ul style="margin-top:.5rem">
+      <li><strong>PC-relative</strong>：disp 是相對值，載入到哪裡都一樣 ✅</li>
+      <li><strong>Base-relative</strong>：disp 是相對值 ✅</li>
+      <li><strong>Immediate addressing</strong>：值本身不是位址 ✅</li>
+      <li style="color:#dc2626"><strong>Format 4（+op）</strong>：含完整 20-bit 位址，載入到不同位址就要修改 ❌</li>
+      <li style="color:#dc2626"><strong>SIC 直接定址</strong>：含絕對位址，也要修改 ❌</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📝 3. Modification Record（M record）</h2>
+  <p>M record 告訴 Loader：「這個欄位裡的位址需要加上載入時的起始位址」。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 130" width="680" height="130" font-family="monospace" font-size="12">
+      <text x="340" y="18" text-anchor="middle" font-weight="bold" font-size="15" fill="#1e40af" font-family="sans-serif">Modification Record 格式</text>
+      <!-- M record structure -->
+      <rect x="20"  y="30" width="35"  height="55" rx="4" fill="#7c3aed"/>
+      <text x="37"  y="62" text-anchor="middle" fill="white" font-weight="bold" font-size="16">M</text>
+      <rect x="60"  y="30" width="190" height="55" rx="4" fill="#f5f3ff" stroke="#7c3aed"/>
+      <rect x="255" y="30" width="90"  height="55" rx="4" fill="#fde8ff" stroke="#a78bfa"/>
+      <rect x="350" y="30" width="310" height="55" rx="4" fill="#eff6ff" stroke="#93c5fd"/>
+      <!-- Labels -->
+      <text x="155" y="52" text-anchor="middle" fill="#6d28d9" font-weight="bold">Col.2-7</text>
+      <text x="155" y="69" text-anchor="middle" fill="#64748b">起始位置（hex）</text>
+      <text x="155" y="82" text-anchor="middle" fill="#64748b">相對程式起始</text>
+      <text x="300" y="52" text-anchor="middle" fill="#6d28d9" font-weight="bold">Col.8-9</text>
+      <text x="300" y="69" text-anchor="middle" fill="#64748b">長度（half-bytes）</text>
+      <text x="300" y="82" text-anchor="middle" fill="#64748b">= 幾個 hex 字元</text>
+      <text x="505" y="52" text-anchor="middle" fill="#1e40af" font-weight="bold">Col.10+（可選）</text>
+      <text x="505" y="69" text-anchor="middle" fill="#64748b">+/- 符號 + 外部符號名稱</text>
+      <text x="505" y="82" text-anchor="middle" fill="#64748b">（連結器用，單一模組不需要）</text>
+      <!-- Example -->
+      <text x="20" y="110" fill="#64748b" font-size="11">例：M000007 05 → 從偏移 0x000007 起，5 個 half-bytes（即位址欄位）需加上載入位址</text>
+    </svg>
+    <div class="caption">Loader 收到 M record 後，把該欄位加上程式實際載入的起始位址</div>
+  </div>
+
+  <h3>完整 Object Program（含 M records）</h3>
+  <pre><code>HCOPY  000000 001073    <span class="cm">← 起始位址 0（Relocatable）</span>
+T000000 1C 17202D...   <span class="cm">← Text records</span>
+T00001E 15 ...
+T000039 1E ...
+...
+<span class="lbl">M000007 05</span>            <span class="cm">← 偏移 7 的 5 個 nibble 需要加上載入位址</span>
+<span class="lbl">M000014 05</span>
+<span class="lbl">M000027 05</span>
+E000000                <span class="cm">← 從偏移 0 開始執行</span></code></pre>
+
+  <div class="box box-tip">
+    <strong>💡 計算載入後的位址</strong>
+    如果程式被載入到 <code>0x4000</code>，而 M record 指定的欄位原本是 <code>0x00007</code>，
+    載入後那個欄位 = <code>0x00007 + 0x4000 = 0x04007</code>
+  </div>
+</div>
+
+<div class="section">
+  <h2>🎯 4. 完整流程：從原始碼到執行</h2>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 100" width="680" height="100" font-family="sans-serif" font-size="12">
+      <defs><marker id="fa" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker></defs>
+      <!-- Boxes -->
+      <rect x="10"  y="25" width="90" height="50" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+      <rect x="130" y="25" width="90" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <rect x="250" y="25" width="90" height="50" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+      <rect x="370" y="25" width="90" height="50" rx="8" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <rect x="490" y="25" width="90" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <rect x="610" y="25" width="60" height="50" rx="8" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <!-- Labels -->
+      <text x="55"  y="48" text-anchor="middle" fill="#1e293b" font-weight="bold">原始碼</text>
+      <text x="55"  y="65" text-anchor="middle" fill="#64748b">.asm</text>
+      <text x="175" y="48" text-anchor="middle" fill="#1e40af" font-weight="bold">組譯器</text>
+      <text x="175" y="65" text-anchor="middle" fill="#64748b">Assembler</text>
+      <text x="295" y="48" text-anchor="middle" fill="#1e293b" font-weight="bold">目的碼</text>
+      <text x="295" y="65" text-anchor="middle" fill="#64748b">.obj</text>
+      <text x="415" y="48" text-anchor="middle" fill="#065f46" font-weight="bold">連結器</text>
+      <text x="415" y="65" text-anchor="middle" fill="#64748b">Linker</text>
+      <text x="535" y="48" text-anchor="middle" fill="#1e40af" font-weight="bold">載入器</text>
+      <text x="535" y="65" text-anchor="middle" fill="#64748b">Loader</text>
+      <text x="640" y="48" text-anchor="middle" fill="#6d28d9" font-weight="bold">執行</text>
+      <text x="640" y="65" text-anchor="middle" fill="#64748b">CPU</text>
+      <!-- Arrows -->
+      <path d="M102,50 L128,50" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#fa)"/>
+      <path d="M222,50 L248,50" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#fa)"/>
+      <path d="M342,50 L368,50" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#fa)"/>
+      <path d="M462,50 L488,50" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#fa)"/>
+      <path d="M582,50 L608,50" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#fa)"/>
+    </svg>
+    <div class="caption">組譯 → 連結（合併多個 .obj）→ 載入（決定實際位址，執行 M records）→ 執行</div>
+  </div>
+</div>
+
+<!-- ── 課堂練習 ───────────────────────────────────────── -->
+<div class="section practice-section">
+  <h2>✏️ 課堂練習 <span class="practice-badge">M Record 實作</span></h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1rem;">
+    同一支程式分別以「固定起始位址」和「可重定位」兩種方式組譯，比較 Object Program 的差異，釐清 M record 的意義。
+  </p>
+
+  <div class="practice">
+    <div class="p-num">程式 TEST · 絕對 vs 可重定位</div>
+    <div class="p-q">
+      下列程式分別在 <strong>起始位址 3000₁₆（版本 A）</strong> 和 <strong>起始位址 0000₁₆（可重定位，版本 B）</strong> 組譯。<br>
+      寫出兩個版本的 Object Program，並說明版本 B 為何需要 M records。
+    </div>
+<pre style="margin:.5rem 0 .75rem;">       TEST   START  ????   ← 分別填 3000 和 0000
+FIRST  LDX    ZERO
+       LDA    ZERO
+LOOP   ADD    TABLE,X
+       TIX    COUNT
+       JLT    LOOP
+       STA    TOTAL
+       RSUB
+TABLE  RESW   10
+COUNT  WORD   10
+TOTAL  RESW   1
+ZERO   WORD   0
+TMP    WORD   20
+       END    FIRST</pre>
+    <div class="p-hint">M record 格式：M^起始位址^長度（半位元組數）。長度通常是 04（修改 4 個 hex digit = 15-bit address field）。版本 B 中每個有位址欄位的指令都要一個 M record。</div>
+    <details>
+      <summary>查看解答</summary>
+      <div class="answer">
+        <strong>版本 A（START 3000，絕對定址）：</strong>
+        <div class="table-wrap" style="font-size:.85rem;margin:.4rem 0 .6rem;">
+          <table>
+            <tr><th>Loc</th><th>Symbol</th><th>Mnemonic</th><th>Operand</th><th>Object Code</th></tr>
+            <tr><td>3000</td><td>FIRST</td><td>LDX</td><td>ZERO</td><td>04 3039</td></tr>
+            <tr><td>3003</td><td></td><td>LDA</td><td>ZERO</td><td>00 3039</td></tr>
+            <tr><td>3006</td><td>LOOP</td><td>ADD</td><td>TABLE,X</td><td>18 B015 <em>(x=1: byte1=0x80|0x30=0xB0)</em></td></tr>
+            <tr><td>3009</td><td></td><td>TIX</td><td>COUNT</td><td>2C 3033</td></tr>
+            <tr><td>300C</td><td></td><td>JLT</td><td>LOOP</td><td>38 3006</td></tr>
+            <tr><td>300F</td><td></td><td>STA</td><td>TOTAL</td><td>0C 3036</td></tr>
+            <tr><td>3012</td><td></td><td>RSUB</td><td></td><td>4C 0000</td></tr>
+            <tr><td>3015</td><td>TABLE</td><td>RESW</td><td>10</td><td>—</td></tr>
+            <tr><td>3033</td><td>COUNT</td><td>WORD</td><td>10</td><td>00000A</td></tr>
+            <tr><td>3036</td><td>TOTAL</td><td>RESW</td><td>1</td><td>—</td></tr>
+            <tr><td>3039</td><td>ZERO</td><td>WORD</td><td>0</td><td>000000</td></tr>
+            <tr><td>303C</td><td>TMP</td><td>WORD</td><td>20</td><td>000014</td></tr>
+          </table>
+        </div>
+<pre>H^TEST  ^003000^00003F
+T^003000^15^043039^003039^18B015^2C3033^383006^0C3036^4C0000
+T^003033^03^00000A
+T^003039^06^000000^000014
+E^003000</pre>
+        注意：T^003033 只有 3 bytes（COUNT），不能跨過 TOTAL 的 RESW 空白。ZERO 和 TMP 合併成一個 T record（各 3 bytes，共 6 bytes，連續位址）。<br><br>
+
+        <strong>版本 B（START 0000，可重定位）：</strong>
+<pre>H^TEST  ^000000^00003F
+T^000000^15^040039^000039^188015^2C0033^380006^0C0036^4C0000
+T^000033^03^00000A
+T^000039^06^000000^000014
+M^000001^04
+M^000004^04
+M^000007^04
+M^00000A^04
+M^00000D^04
+M^000010^04
+E^000000</pre>
+        版本 B 的 ADD TABLE,X：TABLE=0x0015，x=1 → byte1=0x80|0x00=0x80 → 18 80 15 = <code>188015</code>（與版本 A 的 18B015 不同，因為起始位址不同）。
+        <strong>M record 的意義：</strong><br>
+        版本 B 的指令中，每條「有位址欄位的指令」都把 Label 的<em>相對位址（從 0 開始）</em>填進去。<br>
+        例如 LDX ZERO → object code = <code>04 0039</code>（ZERO 在 offset 0x0039）。<br>
+        載入器把程式放到 0x3000 時，必須把所有 M record 指定的欄位都<strong>加上 0x3000</strong>：<br>
+        0x0039 + 0x3000 = 0x3039 → 這樣才和版本 A 的結果一樣。<br><br>
+        <em>M record 的 04 代表：從該起始位元組起，共 4 個 hex digit（= 15-bit address field）需要修改。</em>
+      </div>
+    </details>
+  </div>
+
+  <div class="practice">
+    <div class="p-num">快速辨認 · 哪些指令需要 M record？</div>
+    <div class="p-q">對可重定位程式，以下哪些指令需要 M record？</div>
+    <ol style="padding-left:1.5rem;margin:.4rem 0 .6rem;">
+      <li><code>RSUB</code>（operand 為空，object code = 4C0000）</li>
+      <li><code>LDA ZERO</code>（ZERO 是程式內定義的 label）</li>
+      <li><code>LDA #49</code>（SIC/XE 立即定址，operand 是常數）</li>
+      <li><code>WORD 5</code>（資料宣告，值是常數）</li>
+      <li><code>STA TOTAL</code>（TOTAL 是程式內定義的 label）</li>
+    </ol>
+    <details>
+      <summary>查看答案</summary>
+      <div class="answer">
+        ① RSUB → <strong>不需要</strong>：address field 固定是 0（無 operand），不包含可重定位位址<br>
+        ② LDA ZERO → <strong>需要</strong>：address field = ZERO 的相對位址，載入時要加 base<br>
+        ③ LDA #49 → <strong>不需要</strong>：立即定址的 operand 是常數值，不是記憶體位址<br>
+        ④ WORD 5 → <strong>不需要</strong>：純常數，不是位址<br>
+        ⑤ STA TOTAL → <strong>需要</strong>：address field = TOTAL 的相對位址<br><br>
+        <strong>規則</strong>：只有「address field 存放另一個 symbol 的位址」時才需要 M record。常數和 RSUB 的 0000 不算。
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="section">
+  <h2>🏆 8 堂課總複習</h2>
+  <div class="table-wrap"><table>
+    <tr><th>課次</th><th>主題</th><th>最重要的概念</th></tr>
+    <tr><td>1</td><td>數值系統</td><td>2's Complement、進位轉換、IEEE 浮點數</td></tr>
+    <tr><td>2</td><td>SIC 架構</td><td>5個暫存器（A/X/L/PC/SW）、24-bit指令格式、Fetch-Decode-Execute</td></tr>
+    <tr><td>3</td><td>SIC/XE</td><td>4種Format、nixbpe旗標、B暫存器</td></tr>
+    <tr><td>4</td><td>組合語言</td><td>Label/Mnemonic/Operand結構、Pseudo指令（START/END/BYTE/WORD/RESB/RESW）</td></tr>
+    <tr class="highlight-row"><td>5</td><td>Two-Pass 組譯器</td><td>OPTAB/SYMTAB/LOCCTR、H-T-E record格式</td></tr>
+    <tr><td>6</td><td>One-Pass</td><td>Forward Reference、Forward Reference List、EQU 問題</td></tr>
+    <tr class="highlight-row"><td>7</td><td>定址模式</td><td>PC-relative（disp=目標-PC）、Base-relative、Immediate、Indirect</td></tr>
+    <tr><td>8</td><td>程式重定位</td><td>Relocatable vs Absolute、M record 格式</td></tr>
+  </table></div>
+</div>
+
+<div class="lesson-nav-bottom">
+  <a href="lesson7.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>SIC/XE 定址模式</div></a>
+  <a href="index.html" class="nav-btn next"><span>🏠</span><div><span class="nav-label">完成！</span>回到課程目錄</div></a>
+</div>
+</div>
+</body>
+</html>
