@@ -238,9 +238,122 @@
   </div>
 </div>
 
+<!-- 定址模式對照 -->
+<div class="section">
+  <h2>🔍 5. 各定址模式 Object Code 對照（同一指令，不同模式）</h2>
+  <p>以下用 <strong>ADD</strong>（opcode = 18₁₆）為例，在相同 Loc 下使用六種不同定址模式，直接比較 Object Code 的差異。</p>
+
+  <div class="box box-info" style="margin-bottom:1rem;">
+    <strong>📌 情境設定</strong><br>
+    指令 Loc = 1013，下一條 PC = 1016<br>
+    BASE 已設為 TABLE1（即 (B) = 21C1）<br>
+    TABLE = 102A（在 PC-relative 範圍內）<br>
+    TABLE1 = 21C1（超出 PC-relative，但在 Base-relative 範圍）
+  </div>
+
+  <div class="table-wrap"><table>
+    <tr>
+      <th>語法</th><th>模式</th><th>byte0</th><th>byte1 高 4 bits（xbpe）</th><th>byte1 低 4 bits（disp[11:8]）</th><th>byte2（disp[7:0]）</th><th>Object Code</th><th>Loc +</th>
+    </tr>
+    <tr>
+      <td><code>ADD TABLE</code></td><td>PC-relative</td>
+      <td>1B<br><small>ni=11</small></td>
+      <td><strong>0010</strong> = 2<br><small>p=1</small></td>
+      <td>0<br><small>disp=102A−1016=0x14</small></td>
+      <td>14</td>
+      <td><strong>1B 20 14</strong></td><td>+3</td>
+    </tr>
+    <tr style="background:#eff6ff">
+      <td><code>ADD TABLE, X</code></td><td>PC-relative<br>+ Indexed</td>
+      <td>1B</td>
+      <td><strong>1010</strong> = A<br><small>x=1, p=1</small></td>
+      <td>0</td>
+      <td>14</td>
+      <td><strong>1B A0 14</strong></td><td>+3</td>
+    </tr>
+    <tr>
+      <td><code>ADD TABLE1</code></td><td>Base-relative</td>
+      <td>1B</td>
+      <td><strong>0100</strong> = 4<br><small>b=1</small></td>
+      <td>0<br><small>disp=21C1−21C1=0</small></td>
+      <td>00</td>
+      <td><strong>1B 40 00</strong></td><td>+3</td>
+    </tr>
+    <tr style="background:#eff6ff">
+      <td><code>ADD TABLE1, X</code></td><td>Base-relative<br>+ Indexed</td>
+      <td>1B</td>
+      <td><strong>1100</strong> = C<br><small>x=1, b=1</small></td>
+      <td>0</td>
+      <td>00</td>
+      <td><strong>1B C0 00</strong></td><td>+3</td>
+    </tr>
+    <tr style="background:#f0f9ff">
+      <td><code>ADD #5</code></td><td>Immediate</td>
+      <td><strong>19</strong><br><small>ni=01</small></td>
+      <td><strong>0000</strong> = 0<br><small>xbpe 全 0</small></td>
+      <td>0</td>
+      <td>05</td>
+      <td><strong>19 00 05</strong></td><td>+3</td>
+    </tr>
+    <tr style="background:#fffbeb">
+      <td><code>+ADD TABLE1</code></td><td>Format 4<br>（Extended）</td>
+      <td>1B</td>
+      <td><strong>0001</strong> = 1<br><small>e=1</small></td>
+      <td>TABLE1[19:16]=0</td>
+      <td>21（byte2）<br>C1（byte3）</td>
+      <td><strong>1B 10 21 C1</strong><br><small>（4 bytes）</small></td>
+      <td style="color:#d97706;font-weight:bold">+4</td>
+    </tr>
+  </table></div>
+
+  <h3>byte0 與 byte1 高 4 bits（xbpe）速查</h3>
+  <div class="diagram">
+    <svg viewBox="0 0 680 210" width="680" height="210" font-family="sans-serif" font-size="12">
+      <text x="340" y="16" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">Object Code byte0 + byte1 高 4 bits 決定定址模式</text>
+
+      <!-- byte0 決定 ni -->
+      <rect x="10" y="25" width="300" height="80" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+      <text x="160" y="42" text-anchor="middle" fill="#1e293b" font-weight="bold">byte0（決定 n, i）</text>
+      <text x="30"  y="62" fill="#1e293b">ni = 11 → simple（一般定址）</text>
+      <text x="30"  y="77" fill="#1e40af">ni = 01 → immediate（#）</text>
+      <text x="30"  y="92" fill="#7c3aed">ni = 10 → indirect（@）</text>
+      <text x="30" y="100" fill="#64748b" font-size="10">byte0 = (opcode &amp; FC) | ni</text>
+
+      <!-- byte1 高 4 bits -->
+      <rect x="330" y="25" width="340" height="175" rx="8" fill="#f8fafc" stroke="#64748b" stroke-width="1.5"/>
+      <text x="500" y="42" text-anchor="middle" fill="#1e293b" font-weight="bold">byte1 高 4 bits（x b p e）</text>
+      <text x="350" y="62"  fill="#059669"><tspan font-weight="bold">0010</tspan> = 2 → PC-relative（p=1）</text>
+      <text x="350" y="80"  fill="#059669"><tspan font-weight="bold">1010</tspan> = A → PC-relative + Indexed（x=1,p=1）</text>
+      <text x="350" y="98"  fill="#7c3aed"><tspan font-weight="bold">0100</tspan> = 4 → Base-relative（b=1）</text>
+      <text x="350" y="116" fill="#7c3aed"><tspan font-weight="bold">1100</tspan> = C → Base-relative + Indexed（x=1,b=1）</text>
+      <text x="350" y="134" fill="#1e40af"><tspan font-weight="bold">0000</tspan> = 0 → Immediate / Simple（無相對）</text>
+      <text x="350" y="152" fill="#d97706"><tspan font-weight="bold">0001</tspan> = 1 → Format 4（e=1）</text>
+      <text x="350" y="175" fill="#64748b" font-size="10">
+        xbpe 各 1 bit：x=索引, b=base-rel, p=PC-rel, e=Format4
+      </text>
+
+      <!-- 分隔線 -->
+      <line x1="325" y1="25" x2="325" y2="200" stroke="#e2e8f0" stroke-width="1"/>
+
+      <!-- 標注 -->
+      <text x="160" y="130" text-anchor="middle" fill="#64748b" font-size="11">byte0 低 2 bits 決定</text>
+      <text x="160" y="145" text-anchor="middle" fill="#64748b" font-size="11">是否立即/間接</text>
+      <text x="500" y="195" text-anchor="middle" fill="#64748b" font-size="11">byte1 高 nibble 決定如何算出最終位址</text>
+    </svg>
+  </div>
+
+  <div class="box box-warning">
+    <strong>⚠️ 關鍵規律</strong><br>
+    不管 PC-relative 還是 Base-relative，byte0 都一樣（ni=11，同 opcode）。<br>
+    區別只在 <strong>byte1 高 nibble</strong>：2（PC）/ 4（Base）/ A（PC+X）/ C（Base+X）<br>
+    Immediate 的區別在 <strong>byte0</strong>（ni=01，byte0 值 +1）<br>
+    Format 4 的區別在 <strong>byte1 高 nibble = 1</strong>（e=1），且 Object Code 多 2 個 hex 字元
+  </div>
+</div>
+
 <!-- Format 2 -->
 <div class="section">
-  <h2>🔢 5. Format 2：暫存器指令（Loc +2）</h2>
+  <h2>🔢 6. Format 2：暫存器指令（Loc +2）</h2>
   <p>Format 2 只有 <strong>2 bytes = 4 hex 字元</strong>，結構：<code>[opcode 8] [r1 4] [r2 4]</code>，完全沒有 nixbpe 或 disp，LOC +2。</p>
 
   <h3>暫存器編號（r1 / r2 欄填什麼）</h3>
@@ -268,7 +381,7 @@
 
 <!-- Format 4 -->
 <div class="section">
-  <h2>➕ 6. Format 4（+ 前綴）：Object Code = 4 bytes = 8 hex 字元（Loc +4）</h2>
+  <h2>➕ 7. Format 4（+ 前綴）：Object Code = 4 bytes = 8 hex 字元（Loc +4）</h2>
   <p>指令前加 <code>+</code>（如 <code>+LDB</code>、<code>+STA</code>）→ Format 4，比 Format 3 多 1 byte，LOC <strong>+4</strong>，Object Code 從 6 hex 變成 <strong>8 hex 字元</strong>，e=1。</p>
 
   <div class="diagram">
@@ -322,7 +435,7 @@
 
 <!-- SIC vs SIC/XE RSUB -->
 <div class="section">
-  <h2>⚠️ 7. SIC vs SIC/XE：RSUB Object Code 不同</h2>
+  <h2>⚠️ 8. SIC vs SIC/XE：RSUB Object Code 不同</h2>
   <div class="table-wrap"><table>
     <tr><th></th><th>SIC</th><th>SIC/XE</th></tr>
     <tr><td>RSUB Object Code</td><td><strong>4C 00 00</strong></td><td><strong>4F 00 00</strong></td></tr>
