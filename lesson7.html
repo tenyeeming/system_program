@@ -238,6 +238,155 @@
   </div>
 </div>
 
+<!-- Format 2 -->
+<div class="section">
+  <h2>🔢 5. Format 2：暫存器指令（Loc +2）</h2>
+  <p>Format 2 只有 <strong>2 bytes = 4 hex 字元</strong>，結構：<code>[opcode 8] [r1 4] [r2 4]</code>，完全沒有 nixbpe 或 disp，LOC +2。</p>
+
+  <h3>暫存器編號（r1 / r2 欄填什麼）</h3>
+  <div class="table-wrap"><table>
+    <tr><th>名稱</th><th>A</th><th>X</th><th>L</th><th>B</th><th>S</th><th>T</th><th>F</th><th>PC</th><th>SW</th></tr>
+    <tr><td><strong>編號（hex）</strong></td>
+      <td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>8</td><td>9</td>
+    </tr>
+  </table></div>
+
+  <h3>Object Code 計算</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Loc</th><th>指令</th><th>Object Code</th><th>計算方式</th></tr>
+    <tr><td>1019</td><td>ADDR S, X</td><td><strong>90 41</strong></td><td>opcode=90，r1=S=<strong>4</strong>，r2=X=<strong>1</strong> → 90 <strong>4</strong><strong>1</strong></td></tr>
+    <tr><td>101B</td><td>COMPR X, T</td><td><strong>A0 15</strong></td><td>opcode=A0，r1=X=<strong>1</strong>，r2=T=<strong>5</strong> → A0 <strong>1</strong><strong>5</strong></td></tr>
+    <tr><td>—</td><td>SUBR A, X</td><td><strong>94 01</strong></td><td>opcode=94，r1=A=<strong>0</strong>，r2=X=<strong>1</strong> → 94 <strong>0</strong><strong>1</strong></td></tr>
+  </table></div>
+
+  <div class="box box-info">
+    <strong>📌 Format 2 速記</strong><br>
+    Object Code = [opcode 2 hex][r1 1 hex][r2 1 hex]，總共 4 hex 字元（2 bytes）<br>
+    r1、r2 直接查暫存器編號表，各佔 1 個 hex digit 拼上去即可
+  </div>
+</div>
+
+<!-- Format 4 -->
+<div class="section">
+  <h2>➕ 6. Format 4（+ 前綴）：Object Code = 4 bytes = 8 hex 字元（Loc +4）</h2>
+  <p>指令前加 <code>+</code>（如 <code>+LDB</code>、<code>+STA</code>）→ Format 4，比 Format 3 多 1 byte，LOC <strong>+4</strong>，Object Code 從 6 hex 變成 <strong>8 hex 字元</strong>，e=1。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 120" width="680" height="120" font-family="monospace" font-size="12">
+      <text x="340" y="16" text-anchor="middle" font-weight="bold" font-size="14" fill="#d97706" font-family="sans-serif">Format 4 Object Code 結構（4 bytes）</text>
+      <!-- Byte 0 -->
+      <rect x="10"  y="25" width="155" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="87"  y="41" text-anchor="middle" fill="#92400e" font-weight="bold">Byte 0</text>
+      <text x="87"  y="57" text-anchor="middle" fill="#64748b" font-size="11">opcode[7:2] + n + i</text>
+      <!-- Byte 1 -->
+      <rect x="175" y="25" width="165" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="257" y="41" text-anchor="middle" fill="#92400e" font-weight="bold">Byte 1</text>
+      <text x="257" y="57" text-anchor="middle" fill="#64748b" font-size="11">x + b + p + <tspan fill="#dc2626" font-weight="bold">e=1</tspan> + addr[19:16]</text>
+      <!-- Byte 2 -->
+      <rect x="350" y="25" width="155" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="427" y="41" text-anchor="middle" fill="#92400e" font-weight="bold">Byte 2</text>
+      <text x="427" y="57" text-anchor="middle" fill="#64748b" font-size="11">addr[15:8]</text>
+      <!-- Byte 3 -->
+      <rect x="515" y="25" width="155" height="40" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="592" y="41" text-anchor="middle" fill="#92400e" font-weight="bold">Byte 3</text>
+      <text x="592" y="57" text-anchor="middle" fill="#64748b" font-size="11">addr[7:0]</text>
+      <!-- 對比 Format 3 -->
+      <text x="340" y="100" text-anchor="middle" fill="#64748b" font-size="11" font-family="sans-serif">
+        vs Format 3：Byte0 = opcode+ni，Byte1 = xbpe+disp[11:8]，Byte2 = disp[7:0]（disp 換成完整 20-bit addr）
+      </text>
+    </svg>
+  </div>
+
+  <h3>Object Code 計算範例</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Loc</th><th>指令</th><th>目標位址</th><th>Object Code（8 hex）</th><th>計算說明</th></tr>
+    <tr>
+      <td>100C</td><td>+LDB #TABLE1</td><td>TABLE1=21C1</td>
+      <td><strong>69 10 21 C1</strong></td>
+      <td>LDB opcode=68，immediate(ni=01)→Byte0=<strong>69</strong>；e=1(xbpe=0001)→Byte1=<strong>10</strong>；addr=21C1→Byte2=<strong>21</strong>，Byte3=<strong>C1</strong></td>
+    </tr>
+    <tr>
+      <td>1020</td><td>+STA TOTAL</td><td>TOTAL=3937</td>
+      <td><strong>0F 10 39 37</strong></td>
+      <td>STA opcode=0C，simple(ni=11)→Byte0=<strong>0F</strong>；e=1→Byte1=<strong>10</strong>；addr=3937→Byte2=<strong>39</strong>，Byte3=<strong>37</strong></td>
+    </tr>
+  </table></div>
+
+  <div class="box box-warning">
+    <strong>⚠️ Format 3 vs Format 4 關鍵差異</strong><br>
+    Format 3：Byte1 高 4 bits = xbpe，<strong>低 4 bits = disp[11:8]</strong>（disp 共 12 bits）<br>
+    Format 4：Byte1 高 4 bits = xbpe（e=1），<strong>低 4 bits = addr[19:16]</strong>（addr 共 20 bits）<br>
+    絕大多數情況 addr[19:16]=0，所以 Byte1 = 0x10（simple 或 immediate）
+  </div>
+</div>
+
+<!-- SIC vs SIC/XE RSUB -->
+<div class="section">
+  <h2>⚠️ 7. SIC vs SIC/XE：RSUB Object Code 不同</h2>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>SIC</th><th>SIC/XE</th></tr>
+    <tr><td>RSUB Object Code</td><td><strong>4C 00 00</strong></td><td><strong>4F 00 00</strong></td></tr>
+    <tr><td>原因</td><td>舊格式：[opcode 8][x][addr]，opcode=0x4C 直接填入</td><td>新格式：opcode 低 2 bits 改成 ni=11，0x4C→0x4F</td></tr>
+  </table></div>
+  <div class="box box-info">
+    SIC/XE 中所有 Format 3/4 指令的 Byte0 都要重新算：<br>
+    Byte0 = (original opcode &amp; <code>FC</code>) | ni<br>
+    RSUB opcode=0x4C=<code>0100 1100</code>，ni=11 → <code>0100 1111</code> = <strong>0x4F</strong>
+  </div>
+</div>
+
+<!-- Complete SIC/XE Worked Example -->
+<div class="section practice-section">
+  <h2>✏️ 完整 SIC/XE 範例（2026/04/30 課堂作業）</h2>
+  <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:.75rem;">
+    涵蓋 Format 2/3/4、BASE 指令、大型 RESW、立即定址暫存器、複合定址模式，是最完整的考試題型。
+  </p>
+
+  <div class="box box-info" style="margin-bottom:1rem;font-size:.9rem;">
+    <strong>📌 重要：RESW 大數字轉 Loc</strong><br>
+    RESW n → LOC += n × 3（十進位）→ 再轉十六進位<br>
+    TABLE RESW 1500 → 1500 × 3 = 4500₁₀ = <strong>1194₁₆</strong><br>
+    TABLE1 RESW 2000 → 2000 × 3 = 6000₁₀ = <strong>1770₁₆</strong>
+  </div>
+
+  <div class="table-wrap"><table>
+    <tr><th>Loc</th><th>Label</th><th>Mnemonic</th><th>Operand</th><th>Object Code</th><th>格式 / Loc+幾</th><th>關鍵說明</th></tr>
+    <tr><td>—</td><td>PROG</td><td>START</td><td>1000</td><td>—</td><td>+0</td><td>起始位址，不佔記憶體</td></tr>
+    <tr><td>1000</td><td>ZERO</td><td>WORD</td><td>0</td><td><strong>000000</strong></td><td>+3</td><td>常數 0</td></tr>
+    <tr><td>1003</td><td>BEGIN</td><td>LDX</td><td>#0</td><td><strong>05 0000</strong></td><td>F3 +3</td><td>opcode=04，immediate ni=01 → 05；值=0</td></tr>
+    <tr><td>1006</td><td></td><td>LDS</td><td>#3</td><td><strong>6D 0003</strong></td><td>F3 +3</td><td>LDS opcode=6C，ni=01 → 6D；值=3=0x03</td></tr>
+    <tr><td>1009</td><td></td><td>LDT</td><td>#60</td><td><strong>75 003C</strong></td><td>F3 +3</td><td>LDT opcode=74，ni=01 → 75；#60₁₀=0x3C</td></tr>
+    <tr style="background:#fffbeb"><td>100C</td><td></td><td>+LDB</td><td>#TABLE1</td><td><strong>69 10 21 C1</strong></td><td style="color:#d97706;font-weight:bold">F4 +4</td><td>Format 4，e=1；TABLE1=21C1 填 20-bit addr</td></tr>
+    <tr style="background:#f1f5f9"><td>1010</td><td></td><td>BASE</td><td>TABLE1</td><td style="color:#94a3b8">—</td><td style="color:#059669;font-weight:bold">+0</td><td>虛擬指令，告訴組譯器 B = TABLE1；不佔記憶體</td></tr>
+    <tr><td>1010</td><td></td><td>LDA</td><td>#0</td><td><strong>01 0000</strong></td><td>F3 +3</td><td>LDA opcode=00，ni=01 → 01</td></tr>
+    <tr><td>1013</td><td>LOOP</td><td>ADD</td><td>TABLE, X</td><td><strong>1B A0 14</strong></td><td>F3 +3</td><td>PC-relative + Indexed；PC=1016，disp=102A−1016=0x14；byte1高4=<strong>1010</strong>=A（x=1,p=1）</td></tr>
+    <tr><td>1016</td><td></td><td>ADD</td><td>TABLE1, X</td><td><strong>1B C0 00</strong></td><td>F3 +3</td><td>Base-relative + Indexed；(B)=21C1，disp=21C1−21C1=0；byte1高4=<strong>1100</strong>=C（x=1,b=1）</td></tr>
+    <tr style="background:#faf5ff"><td>1019</td><td></td><td>ADDR</td><td>S, X</td><td><strong>90 41</strong></td><td style="color:#7c3aed;font-weight:bold">F2 +2</td><td>Format 2；r1=S=4，r2=X=1 → 0x41</td></tr>
+    <tr style="background:#faf5ff"><td>101B</td><td></td><td>COMPR</td><td>X, T</td><td><strong>A0 15</strong></td><td style="color:#7c3aed;font-weight:bold">F2 +2</td><td>Format 2；r1=X=1，r2=T=5 → 0x15</td></tr>
+    <tr><td>101D</td><td></td><td>JLT</td><td>LOOP</td><td><strong>3B 2F F3</strong></td><td>F3 +3</td><td>PC-relative；PC=1020，disp=1013−1020=−D=<strong>FF3</strong>（12-bit負數）；byte1=2F（p=1，高4位=F）</td></tr>
+    <tr style="background:#fffbeb"><td>1020</td><td></td><td>+STA</td><td>TOTAL</td><td><strong>0F 10 39 37</strong></td><td style="color:#d97706;font-weight:bold">F4 +4</td><td>Format 4；STA opcode=0C，ni=11 → 0F；TOTAL=3937</td></tr>
+    <tr><td>1024</td><td></td><td>RSUB</td><td></td><td><strong>4F 0000</strong></td><td>F3 +3</td><td>SIC/XE：opcode=4C，ni=11 → <strong>4F</strong>（非 SIC 的 4C！）</td></tr>
+    <tr><td>1027</td><td>ONE</td><td>WORD</td><td>1</td><td><strong>000001</strong></td><td>+3</td><td></td></tr>
+    <tr style="background:#f0fdf4"><td>102A</td><td>TABLE</td><td>RESW</td><td>1500</td><td style="color:#94a3b8">—</td><td style="color:#059669;font-weight:bold">+1194₁₆</td><td>1500×3=4500₁₀=1194₁₆ → 102A+1194=<strong>21BE</strong></td></tr>
+    <tr><td>21BE</td><td>TWO</td><td>WORD</td><td>2</td><td><strong>000002</strong></td><td>+3</td><td></td></tr>
+    <tr style="background:#f0fdf4"><td>21C1</td><td>TABLE1</td><td>RESW</td><td>2000</td><td style="color:#94a3b8">—</td><td style="color:#059669;font-weight:bold">+1770₁₆</td><td>2000×3=6000₁₀=1770₁₆ → 21C1+1770=<strong>3931</strong></td></tr>
+    <tr><td>3931</td><td>THREE</td><td>WORD</td><td>3</td><td><strong>000003</strong></td><td>+3</td><td></td></tr>
+    <tr><td>3934</td><td>FOUR</td><td>WORD</td><td>4</td><td><strong>000004</strong></td><td>+3</td><td></td></tr>
+    <tr style="background:#f0fdf4"><td>3937</td><td>TOTAL</td><td>RESW</td><td>1</td><td style="color:#94a3b8">—</td><td style="color:#059669;font-weight:bold">+3</td><td>→ 393A</td></tr>
+    <tr><td>393A</td><td></td><td>END</td><td>BEGIN</td><td>—</td><td>+0</td><td>程式長度 = 393A − 1000 = 293A₁₆</td></tr>
+  </table></div>
+
+  <div class="box box-warning" style="margin-top:1rem;">
+    <strong>⚠️ 本題最容易錯的 4 個地方</strong>
+    <ol style="margin-top:.5rem;padding-left:1.4rem;">
+      <li><strong>+LDB / +STA</strong>：Loc +4（不是 +3），Object Code 8 個 hex 字元</li>
+      <li><strong>BASE TABLE1</strong>：Loc +0，沒有 Object Code，但之後的指令才能用 base-relative</li>
+      <li><strong>RESW 1500</strong>：Loc 加的是 1500×3=4500₁₀=<strong>1194₁₆</strong>（不是 1500）</li>
+      <li><strong>RSUB</strong>：SIC/XE 寫 <strong>4F0000</strong>，不是 SIC 的 4C0000</li>
+    </ol>
+  </div>
+</div>
+
 <div class="lesson-nav-bottom">
   <a href="lesson6.html" class="nav-btn"><span>←</span><div><span class="nav-label">上一課</span>One-Pass 組譯器</div></a>
   <a href="lesson8.html" class="nav-btn next"><span>→</span><div><span class="nav-label">下一課</span>程式重定位</div></a>
