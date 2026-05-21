@@ -24,15 +24,72 @@
 
 <div class="section">
   <h2>🗺️ 1. 六種定址模式總覽</h2>
+
+  <h3>格式與 Loc 增加量</h3>
+  <p>定址模式決定的是「怎麼算 TA」，但 <strong>Loc 增加多少由指令格式決定</strong>：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 175" width="680" height="175" font-family="sans-serif" font-size="13">
+      <text x="340" y="18" text-anchor="middle" font-weight="bold" font-size="14" fill="#1e40af">指令格式 vs Loc 增加量</text>
+
+      <!-- Format 1 -->
+      <rect x="20"  y="30" width="80"  height="36" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+      <text x="60"  y="50" text-anchor="middle" fill="#1e40af" font-weight="bold">Format 1</text>
+      <text x="60"  y="62" text-anchor="middle" fill="#1e40af" font-size="11">1 byte</text>
+      <text x="60"  y="82" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="15">Loc +1</text>
+      <text x="60" y="100" text-anchor="middle" fill="#64748b" font-size="11">FIX, FLOAT</text>
+      <text x="60" y="114" text-anchor="middle" fill="#64748b" font-size="11">NORM</text>
+
+      <!-- Format 2 -->
+      <rect x="120" y="30" width="140" height="36" rx="6" fill="#fde8ff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="190" y="50" text-anchor="middle" fill="#6d28d9" font-weight="bold">Format 2</text>
+      <text x="190" y="62" text-anchor="middle" fill="#6d28d9" font-size="11">2 bytes</text>
+      <text x="190" y="82" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="15">Loc +2</text>
+      <text x="190" y="100" text-anchor="middle" fill="#64748b" font-size="11">ADDR r1,r2</text>
+      <text x="190" y="114" text-anchor="middle" fill="#64748b" font-size="11">SUBR, MULR…</text>
+
+      <!-- Format 3 -->
+      <rect x="280" y="30" width="220" height="36" rx="6" fill="#dcfce7" stroke="#059669" stroke-width="2"/>
+      <text x="390" y="50" text-anchor="middle" fill="#065f46" font-weight="bold">Format 3 ★最常用</text>
+      <text x="390" y="62" text-anchor="middle" fill="#065f46" font-size="11">3 bytes（含 nixbpe）</text>
+      <text x="390" y="82" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="15">Loc +3</text>
+      <text x="390" y="100" text-anchor="middle" fill="#64748b" font-size="11">LDA m / LDA #c / J @m</text>
+      <text x="390" y="114" text-anchor="middle" fill="#64748b" font-size="11">PC-rel, Base-rel, Immediate, Indirect</text>
+
+      <!-- Format 4 -->
+      <rect x="520" y="30" width="140" height="36" rx="6" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+      <text x="590" y="50" text-anchor="middle" fill="#92400e" font-weight="bold">Format 4</text>
+      <text x="590" y="62" text-anchor="middle" fill="#92400e" font-size="11">4 bytes（+ 前綴）</text>
+      <text x="590" y="82" text-anchor="middle" fill="#dc2626" font-weight="bold" font-size="15">Loc +4</text>
+      <text x="590" y="100" text-anchor="middle" fill="#64748b" font-size="11">+LDA m</text>
+      <text x="590" y="114" text-anchor="middle" fill="#64748b" font-size="11">e=1，完整 20-bit 位址</text>
+
+      <!-- 底部標注 -->
+      <text x="340" y="155" text-anchor="middle" fill="#64748b" font-size="12">
+        Format 3 涵蓋了幾乎所有定址模式，Loc 一律 +3；只有帶 + 前綴的才是 Format 4，Loc +4
+      </text>
+    </svg>
+  </div>
+
+  <h3>完整對照表</h3>
   <div class="table-wrap"><table>
-    <tr><th>定址模式</th><th>語法</th><th>nixbpe</th><th>TA 計算</th></tr>
-    <tr><td>Simple Direct</td><td><code>LDA m</code></td><td>n=1,i=1</td><td>TA = disp + PC 或 B（Format 3）</td></tr>
-    <tr class="highlight-row"><td><strong>PC-Relative</strong></td><td><code>LDA m</code></td><td>n=1,i=1,p=1</td><td>TA = (PC) + disp（disp 可負）</td></tr>
-    <tr><td><strong>Base-Relative</strong></td><td><code>LDA m</code></td><td>n=1,i=1,b=1</td><td>TA = (B) + disp（disp 0-4095）</td></tr>
-    <tr class="highlight-row"><td><strong>Immediate</strong></td><td><code>LDA #c</code></td><td>n=0,i=1</td><td>operand = disp（直接是值，不查記憶體）</td></tr>
-    <tr><td><strong>Indirect</strong></td><td><code>J @m</code></td><td>n=1,i=0</td><td>TA = mem[disp+PC]（間接）</td></tr>
-    <tr><td><strong>Extended（Format 4）</strong></td><td><code>+LDA m</code></td><td>e=1</td><td>TA = 完整 20-bit 位址</td></tr>
+    <tr><th>定址模式</th><th>語法</th><th>格式</th><th>Loc +幾</th><th>nixbpe</th><th>TA 計算</th></tr>
+    <tr><td>PC-Relative</td><td><code>LDA m</code></td><td>Format 3</td><td class="highlight-row"><strong>+3</strong></td><td>n=1,i=1,p=1</td><td>TA = (PC) + disp（disp 可負）</td></tr>
+    <tr><td>Base-Relative</td><td><code>LDA m</code></td><td>Format 3</td><td class="highlight-row"><strong>+3</strong></td><td>n=1,i=1,b=1</td><td>TA = (B) + disp（disp 0~4095）</td></tr>
+    <tr><td>Immediate</td><td><code>LDA #c</code></td><td>Format 3</td><td class="highlight-row"><strong>+3</strong></td><td>n=0,i=1</td><td>operand = disp，不查記憶體</td></tr>
+    <tr><td>Indirect</td><td><code>J @m</code></td><td>Format 3</td><td class="highlight-row"><strong>+3</strong></td><td>n=1,i=0</td><td>TA = mem[(PC)+disp]（兩層）</td></tr>
+    <tr><td>Indexed</td><td><code>LDA m,X</code></td><td>Format 3</td><td class="highlight-row"><strong>+3</strong></td><td>n=1,i=1,x=1</td><td>TA = disp + (X)</td></tr>
+    <tr><td><strong>Extended</strong></td><td><code>+LDA m</code></td><td>Format 4</td><td style="background:#fef9c3;font-weight:bold;color:#dc2626">+4</td><td>e=1</td><td>TA = 完整 20-bit 位址，不用 disp</td></tr>
+    <tr><td>Register-to-Register</td><td><code>ADDR r1,r2</code></td><td>Format 2</td><td style="background:#fef9c3;font-weight:bold;color:#dc2626">+2</td><td>—</td><td>暫存器操作，無記憶體 TA</td></tr>
+    <tr><td>Single Operand</td><td><code>FIX</code></td><td>Format 1</td><td style="background:#fef9c3;font-weight:bold;color:#dc2626">+1</td><td>—</td><td>無 operand</td></tr>
   </table></div>
+
+  <div class="box box-warning">
+    <strong>⚠️ 容易混淆的地方</strong><br>
+    PC-relative、Base-relative、Immediate、Indirect、Indexed 都是 <strong>Format 3</strong>，Loc 一律 <strong>+3</strong>。<br>
+    它們的差別只在 nixbpe 旗標和 TA 的算法，<strong>不影響指令長度</strong>。<br>
+    唯一會讓 Loc 多加 1 的是 <strong>+ 前綴（Format 4，+4）</strong>。
+  </div>
 </div>
 
 <!-- PC-Relative -->
@@ -66,10 +123,20 @@
 
   <h3>範例計算（來自課本）</h3>
   <div class="table-wrap"><table>
-    <tr><th>行</th><th>Loc</th><th>指令</th><th>目標</th><th>PC（Fetch後）</th><th>disp = 目標 - PC</th><th>nixbpe</th></tr>
-    <tr><td>10</td><td>0000</td><td>STL RETADR</td><td>0030</td><td>0003</td><td class="highlight-row">2D</td><td>110010</td></tr>
-    <tr><td>40</td><td>0017</td><td>J CLOOP</td><td>0006</td><td>001A</td><td class="highlight-row">FEC（負數！）</td><td>110010</td></tr>
+    <tr><th>Loc</th><th>指令</th><th>目標位址</th><th>PC（Fetch後）</th><th>disp = 目標 − PC</th><th>nixbpe</th><th>Object Code</th></tr>
+    <tr><td>0000</td><td>STL RETADR</td><td>0030</td><td>0003</td><td class="highlight-row">002D</td><td>110010</td><td><strong>17 20 2D</strong></td></tr>
+    <tr><td>0017</td><td>J CLOOP</td><td>0006</td><td>001A</td><td class="highlight-row">FEC（負數！）</td><td>110010</td><td><strong>3F 2F EC</strong></td></tr>
   </table></div>
+  <div class="box box-info">
+    <strong>📌 SIC/XE Format 3 Object Code 組合方式（3 bytes）</strong><br>
+    Byte 0：opcode[7:2] + n + i（原 opcode 最低兩位改成 ni）<br>
+    Byte 1：x + b + p + e + disp[11:8]<br>
+    Byte 2：disp[7:0]<br><br>
+    <em>STL opcode = 0x14，ni=11，PC-relative(p=1)，disp = 002D：<br>
+    Byte0 = 0001 0111 = <strong>17</strong>，Byte1 = 0010 | 0000 = <strong>20</strong>，Byte2 = <strong>2D</strong> → 17 20 2D</em><br><br>
+    <em>J opcode = 0x3C，ni=11，PC-relative(p=1)，disp = FEC（負數）：<br>
+    Byte0 = 0011 1111 = <strong>3F</strong>，Byte1 = 0010 | 1111 = <strong>2F</strong>，Byte2 = <strong>EC</strong> → 3F 2F EC</em>
+  </div>
 
   <div class="box box-warning">
     <strong>⚠️ PC-Relative 的限制</strong>
@@ -158,9 +225,14 @@
     </div>
     <details><summary>查看答案</summary>
       <div class="answer">
-        試 PC-relative：disp = 0x0036 − 0x1051 = 負的大數，超出 -2048 範圍 ❌<br>
+        試 PC-relative：disp = 0x0036 − 0x1051 = 負的大數，超出 −2048 範圍 ❌<br>
         試 Base-relative：disp = 0x0036 − 0x0033 = <strong>3</strong>（在 0~4095 內）✅<br>
-        → 使用 <strong>Base-relative</strong>，b=1，disp = 0x003，nixbpe = <strong>110100</strong>（含 x=1 因為有 ,X）
+        → 使用 <strong>Base-relative</strong>，b=1，disp = 0x003，nixbpe = <strong>111100</strong>（n=1,i=1,x=1,b=1,p=0,e=0）<br><br>
+        <strong>Object Code（3 bytes）：</strong><br>
+        STCH opcode = 0x54，ni=11 → Byte0 = 0101 0111 = <strong>57</strong><br>
+        x=1, b=1, p=0, e=0 → Byte1 高 4 bits = 1100；disp[11:8] = 0x0 → Byte1 = <strong>C0</strong><br>
+        Byte2 = disp[7:0] = <strong>03</strong><br>
+        → Object Code = <strong>57 C0 03</strong>
       </div>
     </details>
   </div>

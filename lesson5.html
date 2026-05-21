@@ -132,6 +132,28 @@
     <li>BYTE C'xxx'：+字串長度</li>
     <li>BYTE X'xx'：+1</li>
   </ul>
+
+  <h3>Loc 與 Object Code 對照（SUM 程式節錄）</h3>
+  <p>Pass 1 算好每行的 Loc，Pass 2 查 SYMTAB 填入位址，才能產生 Object Code：</p>
+  <div class="table-wrap"><table>
+    <tr><th>Loc</th><th>Label</th><th>Mnemonic</th><th>Operand</th><th>Object Code</th><th>說明</th></tr>
+    <tr><td>2000</td><td>FIRST</td><td>LDX</td><td>ZERO</td><td><strong>04 2018</strong></td><td>opcode=04，ZERO=2018，x=0</td></tr>
+    <tr><td>2003</td><td></td><td>LDA</td><td>ZERO</td><td><strong>00 2018</strong></td><td>opcode=00，ZERO=2018</td></tr>
+    <tr><td>2006</td><td>LOOP</td><td>ADD</td><td>TABLE,X</td><td><strong>18 A0 1B</strong></td><td>x=1 → 位址欄最高 bit 設 1：201B → A01B</td></tr>
+    <tr><td>2009</td><td></td><td>TIX</td><td>COUNT</td><td><strong>2C 2015</strong></td><td>opcode=2C，COUNT=2015</td></tr>
+    <tr><td>200C</td><td></td><td>JLT</td><td>LOOP</td><td><strong>38 2006</strong></td><td>LOOP=2006（可以向前跳）</td></tr>
+    <tr><td>200F</td><td></td><td>STA</td><td>TOTAL</td><td><strong>0C 2BD3</strong></td><td>TOTAL 在 TABLE 後面，位址差很遠</td></tr>
+    <tr><td>2012</td><td></td><td>RSUB</td><td></td><td><strong>4C 0000</strong></td><td>無 operand，位址欄固定 0000</td></tr>
+    <tr><td>2015</td><td>COUNT</td><td>RESW</td><td>1</td><td style="color:#94a3b8">—</td><td>保留空間，不產生 object code → T record 在此切斷</td></tr>
+    <tr><td>2018</td><td>ZERO</td><td>WORD</td><td>0</td><td><strong>00 0000</strong></td><td>常數 0，寫成 3 bytes = 6 hex 字元</td></tr>
+  </table></div>
+  <div class="box box-info">
+    <strong>📌 SIC Object Code 公式（3 bytes = 24 bits）</strong><br>
+    [opcode 8 bits] [x 1 bit] [位址 15 bits]<br>
+    x=0 直接定址；x=1 索引定址 → 位址欄最高 bit 強制設 1<br>
+    <em>例：ADD TABLE,X，TABLE=201B = 0010 0000 0001 1011<br>
+    x=1 → 最高 bit 設 1 → <strong>1</strong>010 0000 0001 1011 = A0 1B → Object Code = 18 A0 1B</em>
+  </div>
 </div>
 
 <!-- Object Program 格式 -->
@@ -219,6 +241,26 @@ E001000                     <span class="cm">← End: 從 0x1000 開始執行（
 
   把最後一行（END）寫入中間檔
   儲存程式長度 = LOCCTR - 起始位址</code></pre>
+
+  <h3>Pass 1 判斷 Loc 增加量速查</h3>
+  <div class="table-wrap"><table>
+    <tr><th>條件</th><th>Loc +幾</th><th>範例</th></tr>
+    <tr><td>OPCODE 在 OPTAB（一般指令，Format 3）</td><td class="highlight-row"><strong>+3</strong></td><td>LDA、STA、JSUB、J、COMP…</td></tr>
+    <tr><td>OPCODE 在 OPTAB，但帶 <code>+</code> 前綴（Format 4）</td><td style="background:#fef9c3;font-weight:bold">+4</td><td>+LDA、+JSUB（SIC/XE）</td></tr>
+    <tr><td>OPCODE 在 OPTAB，Format 2（暫存器指令）</td><td style="background:#fef9c3;font-weight:bold">+2</td><td>ADDR、SUBR（SIC/XE）</td></tr>
+    <tr><td><code>WORD</code></td><td class="highlight-row"><strong>+3</strong></td><td>THREE WORD 3</td></tr>
+    <tr><td><code>RESW n</code></td><td class="highlight-row"><strong>+3n</strong></td><td>BUFFER RESW 100 → +300</td></tr>
+    <tr><td><code>RESB n</code></td><td class="highlight-row"><strong>+n</strong></td><td>BUF RESB 4096 → +1000₁₆</td></tr>
+    <tr><td><code>BYTE C'...'</code></td><td class="highlight-row"><strong>+字串長度</strong></td><td>EOF BYTE C'EOF' → +3</td></tr>
+    <tr><td><code>BYTE X'xx'</code></td><td class="highlight-row"><strong>+1</strong></td><td>MASK BYTE X'F1' → +1</td></tr>
+    <tr><td><code>START</code> / <code>END</code> / <code>BASE</code> / <code>EQU</code></td><td><strong>+0</strong></td><td>虛擬指令，不佔記憶體</td></tr>
+  </table></div>
+  <div class="box box-warning">
+    <strong>⚠️ 最容易考的陷阱</strong><br>
+    <code>RESB 4096</code> = 4096 bytes = 0x1000₁₆ → Loc 加 <strong>0x1000</strong>（不是 3！）<br>
+    <code>BYTE C'EOF'</code> = 3 bytes → Loc +3；<code>BYTE X'F1'</code> = 1 byte → Loc +1<br>
+    <code>+JSUB RDREC</code>（Format 4）→ Loc +<strong>4</strong>，不是 +3
+  </div>
 </div>
 
 <!-- ── 課堂練習 ───────────────────────────────────────── -->
